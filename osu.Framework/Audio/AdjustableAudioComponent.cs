@@ -2,10 +2,13 @@
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Caching;
 using osu.Framework.Configuration;
+using osu.Framework.Threading;
+using osu.Framework.DebugUtils;
 
 namespace osu.Framework.Audio
 {
@@ -14,6 +17,11 @@ namespace osu.Framework.Audio
         private List<BindableDouble> volumeAdjustments = new List<BindableDouble>();
         private List<BindableDouble> balanceAdjustments = new List<BindableDouble>();
         private List<BindableDouble> frequencyAdjustments = new List<BindableDouble>();
+
+        /// <summary>
+        /// Audio operations will be run on a separate dedicated thread, so we need to schedule any audio API calls using this queue.
+        /// </summary>
+        protected ConcurrentQueue<Action> PendingActions = new ConcurrentQueue<Action>();
 
         /// <summary>
         /// Global volume of this component.
@@ -52,24 +60,21 @@ namespace osu.Framework.Audio
 
         protected readonly BindableDouble FrequencyCalculated = new BindableDouble(1);
 
-        /// <summary>
-        /// Handles invalidation of the component's state.
-        /// </summary>
-        private Cached<double> componentState = new Cached<double>();
-
-        protected AdjustableAudioComponent()
+        protected AdjustableAudioComponent(Scheduler scheduler = null)
         {
             Volume.ValueChanged += InvalidateState;
             Balance.ValueChanged += InvalidateState;
             Frequency.ValueChanged += InvalidateState;
         }
 
+        ~AdjustableAudioComponent()
+        {
+            Dispose(false);
+        }
+
         protected void InvalidateState(object sender = null, EventArgs e = null)
         {
-            //todo: probably change the way invalidation works here to make more sense.
-            //added the explicit update to ensure values propagate instantly rather than at next update (which can be too late for newly played samples).
-            componentState.Invalidate();
-            Update();
+            PendingActions.Enqueue(() => OnStateChanged(this, null));
         }
 
         protected virtual void OnStateChanged(object sender, EventArgs e)
@@ -126,11 +131,11 @@ namespace osu.Framework.Audio
 
         public virtual void Update()
         {
-            componentState.Refresh(delegate
-            {
-                OnStateChanged(this, null);
-                return 1;
-            });
+            ThreadSafety.EnsureNotUpdateThread();
+
+            Action action;
+            while (PendingActions.TryDequeue(out action))
+                action();
         }
 
         #region IDisposable Support
@@ -139,23 +144,26 @@ namespace osu.Framework.Audio
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!IsDisposed)
+            PendingActions.Enqueue(() =>
             {
-                if (disposing)
+                if (!IsDisposed)
                 {
-                    foreach (var d in volumeAdjustments)
-                        d.ValueChanged -= InvalidateState;
-                    foreach (var d in balanceAdjustments)
-                        d.ValueChanged -= InvalidateState;
-                    foreach (var d in frequencyAdjustments)
-                        d.ValueChanged -= InvalidateState;
+                    IsDisposed = true;
+
+                    if (disposing)
+                    {
+                        foreach (var d in volumeAdjustments)
+                            d.ValueChanged -= InvalidateState;
+                        foreach (var d in balanceAdjustments)
+                            d.ValueChanged -= InvalidateState;
+                        foreach (var d in frequencyAdjustments)
+                            d.ValueChanged -= InvalidateState;
+                    }
+
+                    // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                    // TODO: set large fields to null.
                 }
-
-                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
-                // TODO: set large fields to null.
-
-                IsDisposed = true;
-            }
+            });
         }
 
         // This code added to correctly implement the disposable pattern.

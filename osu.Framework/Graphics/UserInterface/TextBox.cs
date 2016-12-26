@@ -49,6 +49,7 @@ namespace osu.Framework.Graphics.UserInterface
         public bool ReadOnly;
 
         private TextInputSource textInput;
+        private Clipboard clipboard;
 
         public delegate void OnCommitHandler(TextBox sender, bool newText);
 
@@ -97,6 +98,8 @@ namespace osu.Framework.Graphics.UserInterface
             this.audio = audio;
 
             textInput = host.GetTextInput();
+            clipboard = host.GetClipboard();
+
             if (textInput != null)
             {
                 textInput.OnNewImeComposition += delegate (string s)
@@ -301,18 +304,29 @@ namespace osu.Framework.Graphics.UserInterface
 
         protected virtual Drawable AddCharacterToFlow(char c)
         {
-            int i = selectionLeft;
-            foreach (Drawable dd in textFlow.Children.Skip(selectionLeft).Take(InternalText.Length - selectionLeft))
-                dd.Depth = -i - 1;
+            // Remove all characters to the right and store them in a local list,
+            // such that their depth can be updated.
+            List<Drawable> charsRight = new List<Drawable>();
+            foreach (Drawable d in textFlow.Children.Skip(selectionLeft))
+                charsRight.Add(d);
+            textFlow.Remove(charsRight);
 
+            // Update their depth to make room for the to-be inserted character.
+            int i = -selectionLeft;
+            foreach (Drawable d in charsRight)
+                d.Depth = --i;
+
+            // Add the character
             Drawable ch;
-
             textFlow.Add(ch = new SpriteText
             {
                 Text = c.ToString(),
                 TextSize = DrawSize.Y,
                 Depth = -selectionLeft,
             });
+
+            // Add back all the previously removed characters
+            textFlow.Add(charsRight);
 
             return ch;
         }
@@ -528,18 +542,24 @@ namespace osu.Framework.Graphics.UserInterface
                         return true;
                     case Key.C:
                         if (string.IsNullOrEmpty(SelectedText) || !AllowClipboardExport) return true;
-                        //System.Windows.Forms.Clipboard.SetText(SelectedText);
+
+                        clipboard?.SetText(SelectedText);
                         return true;
                     case Key.X:
-                        if (string.IsNullOrEmpty(SelectedText)) return true;
+                        if (string.IsNullOrEmpty(SelectedText) || !AllowClipboardExport) return true;
 
-                        //if (AllowClipboardExport)
-                        //    System.Windows.Forms.Clipboard.SetText(SelectedText);
+                        clipboard?.SetText(SelectedText);
                         removeCharacterOrSelection();
                         return true;
                     case Key.V:
-                        //the text is pasted into the hidden textbox, so we don't need any direct clipboard interaction here.
-                        insertString(textInput?.GetPendingText());
+
+                        //the text may get pasted into the hidden textbox, so we don't need any direct clipboard interaction here.
+                        string text = textInput?.GetPendingText();
+
+                        if (string.IsNullOrEmpty(text))
+                            text = clipboard?.GetText();
+
+                        insertString(text);
                         return true;
                 }
 

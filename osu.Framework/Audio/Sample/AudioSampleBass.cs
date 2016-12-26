@@ -8,12 +8,12 @@ namespace osu.Framework.Audio.Sample
 {
     class AudioSampleBass : AudioSample
     {
-        private int channel;
+        private volatile int channel;
 
         bool hasChannel => channel != 0;
-        bool hasSample => sample != 0;
+        bool hasSample => SampleId != 0;
 
-        private int sample;
+        public int SampleId { get; private set; }
 
         float initialFrequency;
 
@@ -24,29 +24,10 @@ namespace osu.Framework.Audio.Sample
         {
         }
 
-        protected AudioSampleBass(int sampleId, bool freeWhenDone = false)
+        public AudioSampleBass(int sampleId, bool freeWhenDone = false)
         {
-            sample = sampleId;
+            SampleId = sampleId;
             this.freeWhenDone = freeWhenDone;
-        }
-
-        private int ensureChannel()
-        {
-            if (!hasSample) return 0;
-
-            if (!hasChannel)
-            {
-                channel = Bass.SampleGetChannel(sample);
-                Bass.ChannelGetAttribute(channel, ChannelAttribute.Frequency, out initialFrequency);
-                InvalidateState();
-            }
-
-            return channel;
-        }
-
-        void resetChannel()
-        {
-            channel = 0;
         }
 
         protected override void OnStateChanged(object sender, EventArgs e)
@@ -68,7 +49,27 @@ namespace osu.Framework.Audio.Sample
 
             base.Play();
 
-            Bass.ChannelPlay(ensureChannel(), restart);
+            PendingActions.Enqueue(() =>
+            {
+                if (!hasSample)
+                {
+                    channel = 0;
+                    return;
+                }
+
+                if (!hasChannel)
+                {
+                    channel = Bass.SampleGetChannel(SampleId);
+                    Bass.ChannelGetAttribute(channel, ChannelAttribute.Frequency, out initialFrequency);
+                }
+            });
+
+            InvalidateState();
+
+            PendingActions.Enqueue(() =>
+            {
+                Bass.ChannelPlay(channel, restart);
+            });
         }
 
         public override void Stop()
@@ -77,7 +78,10 @@ namespace osu.Framework.Audio.Sample
 
             base.Stop();
 
-            Bass.ChannelStop(channel);
+            PendingActions.Enqueue(() =>
+            {
+                Bass.ChannelStop(channel);
+            });
         }
 
         protected override void Dispose(bool disposing)
@@ -86,8 +90,12 @@ namespace osu.Framework.Audio.Sample
 
             if (freeWhenDone)
             {
-                Bass.SampleFree(sample);
-                sample = 0;
+                var s = SampleId;
+                PendingActions.Enqueue(() =>
+                {
+                    Bass.SampleFree(s);
+                });
+                SampleId = 0;
             }
         }
 
@@ -96,9 +104,12 @@ namespace osu.Framework.Audio.Sample
             if (!hasChannel) return;
 
             base.Pause();
-            Bass.ChannelPause(channel);
+            PendingActions.Enqueue(() =>
+            {
+                Bass.ChannelPause(channel);
+            });
         }
 
-        public override bool Playing => hasChannel && Bass.ChannelIsActive(channel) != 0;
+        public override bool Playing => hasChannel && Bass.ChannelIsActive(channel) != 0; //consider moving this bass call to the update method.
     }
 }

@@ -79,6 +79,12 @@ namespace osu.Framework.Graphics
         /// </summary>
         public void Expire(bool calculateLifetimeStart = false)
         {
+            if (clock == null)
+            {
+                LifetimeEnd = double.MinValue;
+                return;
+            }
+
             //expiry should happen either at the end of the last transformation or using the current sequence delay (whichever is highest).
             double max = Time.Current + transformationDelay;
             foreach (ITransform t in Transforms)
@@ -228,13 +234,13 @@ namespace osu.Framework.Graphics
         public void MoveToX(float destination, double duration = 0, EasingTypes easing = EasingTypes.None)
         {
             UpdateTransformsOfType(typeof(TransformPositionX));
-            TransformFloatTo(DrawPosition.X, destination, duration, easing, new TransformPositionX());
+            TransformFloatTo(Position.X, destination, duration, easing, new TransformPositionX());
         }
 
         public void MoveToY(float destination, double duration = 0, EasingTypes easing = EasingTypes.None)
         {
             UpdateTransformsOfType(typeof(TransformPositionY));
-            TransformFloatTo(DrawPosition.Y, destination, duration, easing, new TransformPositionY());
+            TransformFloatTo(Position.Y, destination, duration, easing, new TransformPositionY());
         }
 
         #endregion
@@ -305,13 +311,13 @@ namespace osu.Framework.Graphics
         public void MoveTo(Vector2 newPosition, double duration = 0, EasingTypes easing = EasingTypes.None)
         {
             UpdateTransformsOfType(typeof(TransformPosition));
-            TransformVectorTo(DrawPosition, newPosition, duration, easing, new TransformPosition());
+            TransformVectorTo(Position, newPosition, duration, easing, new TransformPosition());
         }
 
-        public void MoveToRelative(Vector2 offset, int duration = 0, EasingTypes easing = EasingTypes.None)
+        public void MoveToOffset(Vector2 offset, int duration = 0, EasingTypes easing = EasingTypes.None)
         {
             UpdateTransformsOfType(typeof(TransformPosition));
-            MoveTo((Transforms.FindLast(t => t is TransformPosition) as TransformPosition)?.EndValue ?? DrawPosition + offset, duration, easing);
+            MoveTo((Transforms.FindLast(t => t is TransformPosition) as TransformPosition)?.EndValue ?? Position + offset, duration, easing);
         }
 
         #endregion
