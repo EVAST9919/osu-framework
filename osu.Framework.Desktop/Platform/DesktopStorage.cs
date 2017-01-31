@@ -26,24 +26,24 @@ namespace osu.Framework.Desktop.Platform
         public override bool Exists(string path) => File.Exists(Path.Combine(BasePath, path));
 
         public override void Delete(string path) => File.Delete(Path.Combine(BasePath, path));
-        
+
         public override void OpenInNativeExplorer()
         {
             Process.Start(BasePath);
         }
 
-        public override Stream GetStream(string path, FileAccess mode = FileAccess.Read)
+        public override Stream GetStream(string path, FileAccess access = FileAccess.Read, FileMode mode = FileMode.OpenOrCreate)
         {
             path = Path.Combine(BasePath, path);
-            switch (mode)
+            switch (access)
             {
                 case FileAccess.Read:
                     if (!File.Exists(path))
                         return null;
-                    return File.Open(path, FileMode.Open, mode, FileShare.Read);
+                    return File.Open(path, FileMode.Open, access, FileShare.Read);
                 default:
                     Directory.CreateDirectory(Path.GetDirectoryName(path));
-                    return File.Open(path, FileMode.OpenOrCreate, mode);
+                    return File.Open(path, mode, access);
             }
         }
         
@@ -57,5 +57,7 @@ namespace osu.Framework.Desktop.Platform
                 platform = new SQLitePlatformGeneric();
             return new SQLiteConnection(platform, Path.Combine(BasePath, $@"{name}.db"));
         }
+
+        public override void DeleteDatabase(string name) => Delete($@"{name}.db");
     }
 }
