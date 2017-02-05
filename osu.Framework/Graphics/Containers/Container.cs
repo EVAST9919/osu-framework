@@ -43,6 +43,27 @@ namespace osu.Framework.Graphics.Containers
             }
         }
 
+        /// <summary>
+        /// Only has an effect when Masking == true.
+        /// Determines over how many pixels the alpha component smoothly fades out.
+        /// </summary>
+        private float maskingSmoothness = 1;
+        public float MaskingSmoothness
+        {
+            get { return maskingSmoothness; }
+            set
+            {
+                //must be above zero to avoid a div-by-zero in the shader logic.
+                value = Math.Max(0.01f, value);
+
+                if (maskingSmoothness == value)
+                    return;
+
+                maskingSmoothness = value;
+                Invalidate(Invalidation.DrawNode);
+            }
+        }
+
         private float cornerRadius;
 
         /// <summary>
@@ -144,7 +165,8 @@ namespace osu.Framework.Graphics.Containers
                 // We are setting the linear blend range to the approximate size of a _pixel_ here.
                 // This results in the optimal trade-off between crispness and smoothness of the
                 // edges of the masked region according to sampling theory.
-                BlendRange = (scale.X + scale.Y) / 2,
+                BlendRange = MaskingSmoothness * (scale.X + scale.Y) / 2,
+                AlphaExponent = 1,
             };
 
             n.EdgeEffect = EdgeEffect;
@@ -393,7 +415,7 @@ namespace osu.Framework.Graphics.Containers
             // generalization in the future.
             updateChildrenLife();
 
-            if (!IsVisible) return false;
+            if (!IsPresent) return false;
 
             foreach (T child in children.AliveItems)
                 if (child.IsLoaded) child.UpdateSubTree();
@@ -493,7 +515,7 @@ namespace osu.Framework.Graphics.Containers
                 while (drawable is ProxyDrawable)
                     drawable = ((ProxyDrawable)drawable).Original;
 
-                if (!drawable.IsVisible)
+                if (!drawable.IsPresent)
                     continue;
 
                 // We are consciously missing out on potential flattening (due to lack of covariance)
@@ -625,7 +647,15 @@ namespace osu.Framework.Graphics.Containers
                 Vector2 u = ToParentSpace(new Vector2(cornerRadius, 0)) - offset;
                 Vector2 v = ToParentSpace(new Vector2(0, cornerRadius)) - offset;
                 Vector2 inflation = new Vector2((float)Math.Sqrt(u.X * u.X + v.X * v.X), (float)Math.Sqrt(u.Y * u.Y + v.Y * v.Y));
-                return ToParentSpace(drawRect).AABBf.Inflate(inflation);
+
+                RectangleF result = ToParentSpace(drawRect).AABBf.Inflate(inflation);
+                // The above algorithm will return incorrect results if the rounded corners are not fully visible.
+                // To limit bad behavior we at least enforce here, that the bounding box with rounded corners
+                // is never larger than the bounding box without.
+                if (DrawSize.X < CornerRadius * 2 || DrawSize.Y < CornerRadius * 2)
+                    result.Intersect(base.BoundingBox);
+
+                return result;
             }
         }
 
