@@ -6,7 +6,7 @@ using ManagedBass;
 
 namespace osu.Framework.Audio.Sample
 {
-    class AudioSampleBass : AudioSample
+    class AudioSampleBass : AudioSample, IBassAudio
     {
         private volatile int channel;
 
@@ -30,6 +30,19 @@ namespace osu.Framework.Audio.Sample
         {
             SampleId = sampleId;
             this.freeWhenDone = freeWhenDone;
+        }
+
+        void IBassAudio.UpdateDevice(int deviceIndex)
+        {
+            if (hasSample)
+                // counter-intuitively, this is the correct API to use to migrate a sample to a new device.
+                Bass.ChannelSetDevice(SampleId, deviceIndex);
+
+            // Channels created from samples can not be migrated, so we need to ensure
+            // a new channel is created after switching the device. We do not need to
+            // manually free the channel, because our Bass.Free call upon switching devices
+            // takes care of that.
+            channel = 0;
         }
 
         protected override void OnStateChanged(object sender, EventArgs e)

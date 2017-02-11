@@ -8,10 +8,11 @@ using ManagedBass;
 using ManagedBass.Fx;
 using OpenTK;
 using osu.Framework.IO;
+using System.Diagnostics;
 
 namespace osu.Framework.Audio.Track
 {
-    public class AudioTrackBass : AudioTrack
+    public class AudioTrackBass : AudioTrack, IBassAudio
     {
         private float initialFrequency;
 
@@ -43,8 +44,6 @@ namespace osu.Framework.Audio.Track
             {
                 Preview = quick;
 
-                BassFlags flags = Preview ? 0 : (BassFlags.Decode | BassFlags.Prescan);
-
                 if (data == null)
                     throw new ArgumentNullException(nameof(data));
                 //encapsulate incoming stream with async buffer if it isn't already.
@@ -52,14 +51,23 @@ namespace osu.Framework.Audio.Track
 
                 procs = new DataStreamFileProcedures(dataStream);
 
+                BassFlags flags = Preview ? 0 : (BassFlags.Decode | BassFlags.Prescan);
                 audioStreamPrefilter = Bass.CreateStream(StreamSystem.NoBuffer, flags, procs.BassProcedures, IntPtr.Zero);
 
                 if (Preview)
                     activeStream = audioStreamPrefilter;
                 else
                 {
-                    activeStream = BassFx.TempoCreate(audioStreamPrefilter, BassFlags.Decode);
-                    activeStream = BassFx.ReverseCreate(activeStream, 5f, BassFlags.Default);
+                    // We assign the BassFlags.Decode streams to the device "bass_nodevice" to prevent them from getting
+                    // cleaned up during a Bass.Free call. This is necessary for seamless switching between audio devices.
+                    // Further, we provide the flag BassFlags.FxFreeSource such that freeing the activeStream also frees
+                    // all parent decoding streams.
+                    const int bass_nodevice = 0x20000;
+
+                    Bass.ChannelSetDevice(audioStreamPrefilter, bass_nodevice);
+                    activeStream = BassFx.TempoCreate(audioStreamPrefilter, BassFlags.Decode | BassFlags.FxFreeSource);
+                    Bass.ChannelSetDevice(activeStream, bass_nodevice);
+                    activeStream = BassFx.ReverseCreate(activeStream, 5f, BassFlags.Default | BassFlags.FxFreeSource);
 
                     Bass.ChannelSetAttribute(activeStream, ChannelAttribute.TempoUseQuickAlgorithm, 1);
                     Bass.ChannelSetAttribute(activeStream, ChannelAttribute.TempoOverlapMilliseconds, 4);
@@ -71,6 +79,12 @@ namespace osu.Framework.Audio.Track
             });
 
             InvalidateState();
+        }
+
+        void IBassAudio.UpdateDevice(int deviceIndex)
+        {
+            Bass.ChannelSetDevice(activeStream, deviceIndex);
+            Debug.Assert(Bass.LastError == Errors.OK);
         }
 
         public override void Reset()

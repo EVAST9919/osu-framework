@@ -2,12 +2,14 @@
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
+using System.Diagnostics;
 using osu.Framework.Input;
 using osu.Framework.Lists;
 using OpenTK;
 using OpenTK.Input;
 using MouseState = osu.Framework.Input.MouseState;
 using KeyboardState = osu.Framework.Input.KeyboardState;
+using System.Collections.Generic;
 
 namespace osu.Framework.Graphics
 {
@@ -61,17 +63,6 @@ namespace osu.Framework.Graphics
         protected virtual bool OnWheel(InputState state) => false;
 
         /// <summary>
-        /// Request focus, but only receive if nothing else already has focus.
-        /// </summary>
-        /// <returns>Whether we received focus.</returns>
-        protected bool RequestFocus()
-        {
-            if (ourInputManager.FocusedDrawable != null) return false;
-
-            return TriggerFocus();
-        }
-
-        /// <summary>
         /// Focuses this drawable.
         /// </summary>
         /// <param name="screenSpaceState">The input state.</param>
@@ -90,6 +81,19 @@ namespace osu.Framework.Graphics
             ourInputManager?.ChangeFocus(this);
 
             return true;
+        }
+
+        /// <summary>
+        /// If we are not the current focus, this will force our parent InputManager to reconsider what to focus.
+        /// Useful in combination with <see cref="RequestingFocus"/>
+        /// Make sure you are already Present (ie. you've run Update at least once after becoming visible). Schedule recommended.
+        /// </summary>
+        protected void TriggerFocusContention()
+        {
+            Debug.Assert(IsPresent, @"Calling this without being present is likely a mistake. We may not obtain focus when we expect to.");
+
+            if (ourInputManager.FocusedDrawable != this)
+                ourInputManager.ChangeFocus(null);
         }
 
         protected virtual bool OnFocus(InputState state) => false;
@@ -132,7 +136,15 @@ namespace osu.Framework.Graphics
         /// </summary>
         public virtual bool HandleInput => false;
 
-        public virtual bool HasFocus => ourInputManager?.FocusedDrawable == this;
+        /// <summary>
+        /// Check whether we have active focus. Walks up the drawable tree; use sparingly.
+        /// </summary>
+        public bool HasFocus => ourInputManager?.FocusedDrawable == this;
+
+        /// <summary>
+        /// If true, we are eagerly requesting focus. If nothing else above us has (or is requesting focus) we will get it.
+        /// </summary>
+        public virtual bool RequestingFocus => false;
 
         internal bool Hovering;
 
@@ -142,11 +154,22 @@ namespace osu.Framework.Graphics
         /// is in focus.
         /// </summary>
         /// <param name="screenSpacePos">The screen space position to be checked against this drawable.</param>
-        /// <returns>Whether the given position is contained within this drawable.</returns>
         public virtual bool Contains(Vector2 screenSpacePos) => DrawRectangle.Contains(ToLocalSpace(screenSpacePos));
 
         /// <summary>
-        /// Transforms a screen-space input state to the parent's space of this drawable.
+        /// Whether this Drawable can receive, taking into account all optimizations and masking.
+        /// </summary>
+        public bool CanReceiveInput => HandleInput && IsPresent && !IsMaskedAway;
+
+        /// <summary>
+        /// Whether this Drawable is hovered by the given screen space mouse position,
+        /// taking into account whether this Drawable can receive input.
+        /// </summary>
+        /// <param name="screenSpaceMousePos">The mouse position to be checked.</param>
+        public bool IsHovered(Vector2 screenSpaceMousePos) => CanReceiveInput && Contains(screenSpaceMousePos);
+
+        /// <summary>
+        /// Transforms a screen-space input state to the parent's space of this Drawable.
         /// </summary>
         /// <param name="screenSpaceState">The screen-space input state to be transformed.</param>
         /// <returns>The transformed state in parent space.</returns>
@@ -159,6 +182,39 @@ namespace osu.Framework.Graphics
                 Keyboard = screenSpaceState.Keyboard,
                 Mouse = new LocalMouseState(screenSpaceState.Mouse, this)
             };
+        }
+
+        /// <summary>
+        /// This method is responsible for building a queue of Drawables to receive keyboard input
+        /// in-order. This method is overridden by <see cref="Container"/> to be called on all
+        /// children such that the entire scene graph is covered.
+        /// </summary>
+        /// <param name="queue">The input queue to be built.</param>
+        /// <returns>Whether we have added ourself to the queue.</returns>
+        internal virtual bool BuildKeyboardInputQueue(List<Drawable> queue)
+        {
+            if (!CanReceiveInput)
+                return false;
+
+            queue.Add(this);
+            return true;
+        }
+
+        /// <summary>
+        /// This method is responsible for building a queue of Drawables to receive mouse input
+        /// in-order. This method is overridden by <see cref="Container"/> to be called on all
+        /// children such that the entire scene graph is covered.
+        /// </summary>
+        /// <param name="screenSpaceMousePos">The current position of the mouse cursor in screen space.</param>
+        /// <param name="queue">The input queue to be built.</param>
+        /// <returns>Whether we have added ourself to the queue.</returns>
+        internal virtual bool BuildMouseInputQueue(Vector2 screenSpaceMousePos, List<Drawable> queue)
+        {
+            if (!IsHovered(screenSpaceMousePos))
+                return false;
+
+            queue.Add(this);
+            return true;
         }
 
         private struct LocalMouseState : IMouseState
