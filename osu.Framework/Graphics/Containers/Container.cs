@@ -221,9 +221,8 @@ namespace osu.Framework.Graphics.Containers
             children = lifetimeList ?? new LifetimeList<T>(DepthComparer);
             children.Removed += obj =>
             {
-                if (obj.DisposeOnRemove) obj.Dispose();
+                if (obj.DisposeOnDeathRemoval) obj.Dispose();
             };
-
         }
 
         private MarginPadding padding;
@@ -291,7 +290,7 @@ namespace osu.Framework.Graphics.Containers
                 if (drawable.IsLoaded)
                 {
                     Debug.Assert(drawable.Parent == null, "May not add a drawable to multiple containers.");
-                    drawable.ChangeParent(this);
+                    drawable.Parent = this;
                 }
 
                 children.Add(drawable);
@@ -311,23 +310,20 @@ namespace osu.Framework.Graphics.Containers
                 AddInternal(d);
         }
 
-        public virtual bool Remove(T drawable, bool dispose = false)
+        public virtual bool Remove(T drawable)
         {
             if (drawable == null)
                 return false;
 
             if (Content != this)
-                return Content.Remove(drawable, dispose);
+                return Content.Remove(drawable);
 
             bool result = children.Remove(drawable);
             drawable.Parent = null;
 
             if (!result) return false;
 
-            if (dispose)
-                drawable.Dispose();
-            else
-                drawable.Invalidate();
+            drawable.Invalidate();
 
             if (AutoSizeAxes != Axes.None)
                 InvalidateFromChild(Invalidation.Geometry, drawable);
@@ -335,22 +331,22 @@ namespace osu.Framework.Graphics.Containers
             return true;
         }
 
-        public int RemoveAll(Predicate<T> match, bool dispose = false)
+        public int RemoveAll(Predicate<T> match)
         {
             List<T> toRemove = children.FindAll(match);
             for (int i = 0; i < toRemove.Count; i++)
-                Remove(toRemove[i], dispose);
+                Remove(toRemove[i]);
 
             return toRemove.Count;
         }
 
-        public void Remove(IEnumerable<T> range, bool dispose = false)
+        public void Remove(IEnumerable<T> range)
         {
             if (range == null)
                 return;
 
             foreach (T p in range)
-                Remove(p, dispose);
+                Remove(p);
         }
 
         public virtual void Clear(bool dispose = true)
@@ -436,7 +432,7 @@ namespace osu.Framework.Graphics.Containers
             children.LoadRequested += i =>
             {
                 i.PerformLoad(game);
-                i.ChangeParent(this);
+                i.Parent = this;
             };
 
             if (pendingChildrenInternal != null)
@@ -512,8 +508,7 @@ namespace osu.Framework.Graphics.Containers
             {
                 Drawable drawable = current[i];
 
-                while (drawable is ProxyDrawable)
-                    drawable = ((ProxyDrawable)drawable).Original;
+                while (drawable != (drawable = drawable.Original)) ;
 
                 if (!drawable.IsPresent)
                     continue;
@@ -686,6 +681,8 @@ namespace osu.Framework.Graphics.Containers
             //this could cause issues if a child is referenced in more than one containers (or referenced for future use elsewhere).
             if (Content != null)
                 Children?.ForEach(c => c.Dispose());
+
+            OnAutoSize = null;
 
             base.Dispose(isDisposing);
         }
