@@ -1,7 +1,6 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
-using OpenTK;
 using OpenTK.Graphics;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics.Containers;
@@ -169,7 +168,7 @@ namespace osu.Framework.Graphics.UserInterface
         public DropDownMenu()
         {
             AutoSizeAxes = Axes.Y;
-            Direction = FlowDirection.VerticalOnly;
+            Direction = FlowDirections.Vertical;
 
             Children = new Drawable[]
             {
@@ -194,7 +193,7 @@ namespace osu.Framework.Graphics.UserInterface
                                 {
                                     RelativeSizeAxes = Axes.X,
                                     AutoSizeAxes = Axes.Y,
-                                    Direction = FlowDirection.VerticalOnly,
+                                    Direction = FlowDirections.Vertical,
                                 },
                             },
                         },

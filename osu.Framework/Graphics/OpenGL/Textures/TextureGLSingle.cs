@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
@@ -10,11 +10,9 @@ using osu.Framework.DebugUtils;
 using osu.Framework.Graphics.Batches;
 using osu.Framework.Graphics.Primitives;
 using OpenTK;
-using OpenTK.Graphics;
 using OpenTK.Graphics.ES30;
 using RectangleF = osu.Framework.Graphics.Primitives.RectangleF;
 using osu.Framework.Statistics;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics.Colour;
 
 namespace osu.Framework.Graphics.OpenGL.Textures
@@ -430,36 +428,12 @@ namespace osu.Framework.Graphics.OpenGL.Textures
             return didUpload;
         }
 
-        //private static int clearFBO = -1;
-
         private void initializeLevel(int level, int width, int height)
         {
             byte[] transparentWhite = new byte[width * height * 4];
-            int i = 0;
-            while ((i += 4) < transparentWhite.Length)
-            {
-                transparentWhite[i] = 255;
-                transparentWhite[i + 1] = 255;
-                transparentWhite[i + 2] = 255;
-            }
-
             GCHandle h0 = GCHandle.Alloc(transparentWhite, GCHandleType.Pinned);
             GL.TexImage2D(TextureTarget2d.Texture2D, level, TextureComponentCount.Srgb8Alpha8, width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, h0.AddrOfPinnedObject());
             h0.Free();
-
-            //todo: figure why FBO clear method doesn't work.
-
-            //if (clearFBO < 0)
-            //    clearFBO = GL.GenFramebuffer();
-
-            //int lastFramebuffer = GLWrapper.BindFrameBuffer(clearFBO);
-            //GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, All.ColorAttachment0, TextureTarget2d.Texture2D, TextureId, 0);
-
-            //GL.ClearColor(new Color4(255, 255, 255, 0));
-            //GL.Clear(ClearBufferMask.ColorBufferBit);
-            //GL.ClearColor(new Color4(0, 0, 0, 0));
-
-            //GLWrapper.BindFrameBuffer(lastFramebuffer);
         }
     }
 }

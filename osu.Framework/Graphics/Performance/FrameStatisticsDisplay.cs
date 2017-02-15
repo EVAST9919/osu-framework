@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
@@ -9,7 +9,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.OpenGL.Textures;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.Graphics.Transformations;
 using osu.Framework.Input;
 using osu.Framework.Statistics;
 using OpenTK;
@@ -18,7 +17,6 @@ using OpenTK.Input;
 using System.Linq;
 using osu.Framework.Graphics.Primitives;
 using System.Collections.Generic;
-using osu.Framework.Graphics.OpenGL;
 using osu.Framework.Threading;
 
 namespace osu.Framework.Graphics.Performance
@@ -154,7 +152,7 @@ namespace osu.Framework.Graphics.Performance
                                         },
                                         new FlowContainer
                                         {
-                                            Direction = FlowDirection.HorizontalOnly,
+                                            Direction = FlowDirections.Horizontal,
                                             AutoSizeAxes = Axes.X,
                                             RelativeSizeAxes = Axes.Y,
                                             Children = from StatisticsCounterType t in Enum.GetValues(typeof(StatisticsCounterType))

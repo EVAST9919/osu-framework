@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
@@ -414,7 +414,7 @@ namespace osu.Framework.IO.File
             path = PathStandardise(path).TrimEnd('/');
             folder = PathStandardise(folder).TrimEnd('/');
 
-            if (path.Length < folder.Length + 1 || path[folder.Length] != '/' || !path.StartsWith(folder))
+            if (path.Length < folder.Length + 1 || path[folder.Length] != '/' || !path.StartsWith(folder, StringComparison.Ordinal))
                 throw new ArgumentException(path + " isn't contained in " + folder);
 
             return path.Substring(folder.Length + 1);

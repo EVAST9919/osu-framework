@@ -1,10 +1,9 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using osu.Framework.DebugUtils;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Transformations;
@@ -1343,7 +1342,13 @@ namespace osu.Framework.Graphics
         X = 1 << 0,
         Y = 1 << 1,
 
-        Both = X | Y
+        Both = X | Y,
+    }
+
+    public enum Direction
+    {
+        Horizontal = 0,
+        Vertical = 1,
     }
 
     public enum BlendingMode

@@ -1,9 +1,8 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using OpenTK;
 using OpenTK.Graphics;
-using osu.Framework.Allocation;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Sprites;
@@ -47,7 +46,7 @@ namespace osu.Framework.Graphics.UserInterface
             {
                 new FlowContainer
                 {
-                    Direction = FlowDirection.HorizontalOnly,
+                    Direction = FlowDirections.Horizontal,
                     AutoSizeAxes = Axes.Both,
                     Children = new Drawable[]
                     {

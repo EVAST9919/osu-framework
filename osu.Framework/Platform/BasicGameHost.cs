@@ -1,15 +1,13 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -19,13 +17,11 @@ using osu.Framework.Input;
 using osu.Framework.Input.Handlers;
 using osu.Framework.Statistics;
 using osu.Framework.Threading;
-using osu.Framework.Timing;
 using OpenTK;
 using System.Threading.Tasks;
 using osu.Framework.Caching;
 using osu.Framework.Extensions;
 using osu.Framework.Extensions.IEnumerableExtensions;
-using osu.Framework.Graphics.Sprites;
 using OpenTK.Input;
 using OpenTK.Graphics;
 

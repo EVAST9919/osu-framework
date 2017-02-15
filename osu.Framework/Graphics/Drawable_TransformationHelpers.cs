@@ -1,14 +1,12 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
 using System.Diagnostics;
-using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Graphics.Transformations;
 using osu.Framework.Threading;
 using OpenTK;
 using OpenTK.Graphics;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Timing;
 
@@ -230,6 +228,14 @@ namespace osu.Framework.Graphics
         {
             UpdateTransformsOfType(typeof(TransformRotation));
             TransformFloatTo(Rotation, newRotation, duration, easing, new TransformRotation());
+        }
+
+        public void MoveTo(int index, float destination, double duration = 0, EasingTypes easing = EasingTypes.None)
+        {
+            if (index == 0)
+                MoveToX(destination, duration, easing);
+            else
+                MoveToY(destination, duration, easing);
         }
 
         public void MoveToX(float destination, double duration = 0, EasingTypes easing = EasingTypes.None)

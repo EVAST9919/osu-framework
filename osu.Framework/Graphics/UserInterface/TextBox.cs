@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
@@ -96,7 +96,7 @@ namespace osu.Framework.Graphics.UserInterface
                         },
                         TextFlow = new FlowContainer
                         {
-                            Direction = FlowDirection.HorizontalOnly,
+                            Direction = FlowDirections.Horizontal,
                             AutoSizeAxes = Axes.X,
                             RelativeSizeAxes = Axes.Y,
                         },
@@ -134,14 +134,14 @@ namespace osu.Framework.Graphics.UserInterface
             cursorAndLayout.Invalidate();
         }
 
-        protected override void Dispose(bool disposing)
+        protected override void Dispose(bool isDisposing)
         {
             OnChange = null;
             OnCommit = null;
 
             unbindInput();
 
-            base.Dispose(disposing);
+            base.Dispose(isDisposing);
         }
 
         private float textContainerPosX;

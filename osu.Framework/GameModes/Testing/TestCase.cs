@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
@@ -44,17 +44,11 @@ namespace osu.Framework.GameModes.Testing
             {
                 InternalChildren = new Drawable[]
                 {
-                    new ScrollContainer
+                    ButtonsContainer = new FlowContainer
                     {
-                        Children = new[]
-                        {
-                            ButtonsContainer = new FlowContainer
-                            {
-                                Direction = FlowDirection.VerticalOnly,
-                                AutoSizeAxes = Axes.Both,
-                                Spacing = new Vector2(15, 5)
-                            }
-                        }
+                        Direction = FlowDirections.Vertical,
+                        AutoSizeAxes = Axes.Both,
+                        Spacing = new Vector2(15, 5)
                     },
                     Contents = new Container()
                     {
@@ -74,7 +68,7 @@ namespace osu.Framework.GameModes.Testing
             Button b;
             ButtonsContainer.Add(b = new Button
             {
-                Colour = Color4.DarkBlue,
+                BackgroundColour = Color4.DarkBlue,
                 Size = new Vector2(150, 50),
                 Text = text
             });
@@ -84,12 +78,15 @@ namespace osu.Framework.GameModes.Testing
             return b;
         }
 
-        public void AddToggle(string text, Action action)
+        public ToggleButton AddToggle(string text, Action action)
         {
-            ButtonsContainer.Add(new ToggleButton(action)
+            ToggleButton b;
+            ButtonsContainer.Add(b = new ToggleButton(action)
             {
+                Size = new Vector2(150, 50),
                 Text = text
             });
+            return b;
         }
     }
 
@@ -106,14 +103,14 @@ namespace osu.Framework.GameModes.Testing
             this.reloadCallback = reloadCallback;
 
             Size = new Vector2(100, 50);
-            Colour = offColour;
+            BackgroundColour = offColour;
             Action += clickAction;
         }
 
         private void clickAction()
         {
             State = !State;
-            Colour = State ? onColour : offColour;
+            BackgroundColour = State ? onColour : offColour;
             reloadCallback?.Invoke();
         }
     }

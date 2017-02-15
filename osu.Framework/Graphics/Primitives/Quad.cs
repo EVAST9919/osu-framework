@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2007-2016 ppy Pty Ltd <contact@ppy.sh>.
+﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
@@ -176,10 +176,6 @@ namespace osu.Framework.Graphics.Primitives
                 Precision.AlmostEquals(BottomRight.Y, other.BottomRight.Y);
         }
 
-        public override string ToString()
-        {
-            return TopLeft.ToString() + @" " + TopRight.ToString() + @" " + BottomLeft.ToString() + @" " + BottomRight.ToString();
-        }
+        public override string ToString() => $"{TopLeft} {TopRight} {BottomLeft} {BottomRight}";
     }
 }
-
