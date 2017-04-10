@@ -37,16 +37,16 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Cyotek.Drawing.BitmapFont, Version=1.3.1.0, Culture=neutral, PublicKeyToken=58daa28b0b2de221, processorArchitecture=MSIL">
-      <HintPath>$(SolutionDir)\packages\Cyotek.Drawing.BitmapFont.1.3.1\lib\net20\Cyotek.Drawing.BitmapFont.dll</HintPath>
+    <Reference Include="Cyotek.Drawing.BitmapFont, Version=1.0.0.0, Culture=neutral, PublicKeyToken=58daa28b0b2de221, processorArchitecture=MSIL">
+      <HintPath>$(SolutionDir)\packages\Cyotek.Drawing.BitmapFont.1.3.2\lib\net20\Cyotek.Drawing.BitmapFont.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="ManagedBass, Version=0.23.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>$(SolutionDir)\packages\ManagedBass.0.24.0\lib\net45\ManagedBass.dll</HintPath>
+    <Reference Include="ManagedBass, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>$(SolutionDir)\packages\ManagedBass.1.0.2\lib\net45\ManagedBass.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="ManagedBass.PInvoke, Version=0.4.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>$(SolutionDir)\packages\ManagedBass.PInvoke.0.6.1\lib\net45\ManagedBass.PInvoke.dll</HintPath>
+    <Reference Include="ManagedBass.Fx, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>$(SolutionDir)\packages\ManagedBass.Fx.1.0.2\lib\portable-net45+MonoAndroid+uap\ManagedBass.Fx.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=9.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
@@ -54,7 +54,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="OpenTK, Version=2.0.0.0, Culture=neutral, PublicKeyToken=bad199fe84eb3df4, processorArchitecture=MSIL">
-      <HintPath>$(SolutionDir)\packages\ppy.OpenTK.2.0.50727.1339\lib\net45\OpenTK.dll</HintPath>
+      <HintPath>$(SolutionDir)\packages\ppy.OpenTK.2.0.50727.1340\lib\net45\OpenTK.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="SmartThreadPool, Version=2.2.4.0, Culture=neutral, PublicKeyToken=1126fe8b671e8a79, processorArchitecture=MSIL">
@@ -82,12 +82,18 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Audio\AudioComponent.cs" />
     <Compile Include="Audio\IBassAudio.cs" />
+    <Compile Include="Audio\Sample\Sample.cs" />
+    <Compile Include="Audio\Sample\SampleBass.cs" />
     <Compile Include="Caching\Cached.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\MatrixExtensions\MatrixExtensions.cs" />
     <Compile Include="Configuration\BindableLong.cs" />
+    <Compile Include="Configuration\ConfigManager.cs" />
     <Compile Include="Configuration\FrameSync.cs" />
     <Compile Include="Configuration\FrameworkConfigManager.cs" />
+    <Compile Include="Configuration\FrameworkDebugConfig.cs" />
+    <Compile Include="Configuration\WindowMode.cs" />
     <Compile Include="Extensions\Color4Extensions\Color4Extensions.cs" />
     <Compile Include="Extensions\PolygonExtensions\ConvexPolygonExtensions.cs" />
     <Compile Include="Extensions\PolygonExtensions\PolygonExtensions.cs" />
@@ -97,22 +103,39 @@
     <Compile Include="Allocation\TripleBuffer.cs" />
     <Compile Include="Audio\AdjustableAudioComponent.cs" />
     <Compile Include="Audio\AudioCollectionManager.cs" />
-    <Compile Include="Audio\IHasCompletedState.cs" />
-    <Compile Include="Audio\Sample\AudioSampleBass.cs" />
+    <Compile Include="Audio\Sample\SampleChannelBass.cs" />
     <Compile Include="Audio\Sample\SampleManager.cs" />
     <Compile Include="Audio\Track\TrackManager.cs" />
     <Compile Include="DebugUtils\ThreadSafety.cs" />
-    <Compile Include="Extensions\GeneralExtensions.cs" />
+    <Compile Include="Extensions\ExtensionMethods.cs" />
     <Compile Include="Extensions\IEnumerableExtensions\EnumerableExtensions.cs" />
-    <Compile Include="GameModes\Testing\TestBrowser.cs" />
-    <Compile Include="GameModes\Testing\TestCase.cs" />
+    <Compile Include="Extensions\TypeExtensions\TypeExtensions.cs" />
+    <Compile Include="Graphics\Containers\AsyncLoadWrapper.cs" />
+    <Compile Include="Graphics\Containers\DelayedLoadWrapper.cs" />
+    <Compile Include="Graphics\Containers\FillFlowContainer.cs" />
+    <Compile Include="Graphics\Containers\TabbableContainer.cs" />
+    <Compile Include="Graphics\UserInterface\BasicCheckbox.cs" />
+    <Compile Include="Graphics\UserInterface\Checkbox.cs" />
+    <Compile Include="Graphics\UserInterface\IHasCurrentValue.cs" />
+    <Compile Include="Graphics\UserInterface\MenuItem.cs" />
+    <Compile Include="Graphics\UserInterface\Menu.cs" />
+    <Compile Include="Graphics\Sprites\EquilateralTriangle.cs" />
+    <Compile Include="Graphics\UserInterface\TabControl.cs" />
+    <Compile Include="Graphics\UserInterface\TabItem.cs" />
+    <Compile Include="Input\KeyUpEventArgs.cs" />
+    <Compile Include="Allocation\TimedExpiryCache.cs" />
+    <Compile Include="Input\IRequireHighFrequencyMousePosition.cs" />
+    <Compile Include="Input\KeyDownEventArgs.cs" />
+    <Compile Include="Input\MouseDownEventArgs.cs" />
+    <Compile Include="Input\MouseEventArgs.cs" />
+    <Compile Include="Input\MouseUpEventArgs.cs" />
+    <Compile Include="Input\PassThroughInputManager.cs" />
     <Compile Include="Graphics\BlendingInfo.cs" />
     <Compile Include="Graphics\Colour\ColourInfo.cs" />
     <Compile Include="Graphics\Colour\SRGBColour.cs" />
     <Compile Include="Graphics\Containers\BufferedContainerDrawNode.cs" />
     <Compile Include="Graphics\Containers\CircularContainer.cs" />
     <Compile Include="Graphics\Containers\ClickableContainer.cs" />
-    <Compile Include="Graphics\Containers\Container_AutoSize.cs" />
     <Compile Include="Graphics\Containers\FocusedOverlayContainer.cs" />
     <Compile Include="Graphics\Containers\IContainer.cs" />
     <Compile Include="Graphics\Containers\OverlayContainer.cs" />
@@ -120,19 +143,19 @@
     <Compile Include="Graphics\Containers\ContainerDrawNode.cs" />
     <Compile Include="Graphics\Cursor\CursorContainer.cs" />
     <Compile Include="Graphics\IDrawable.cs" />
-    <Compile Include="Graphics\Line\Path.cs" />
-    <Compile Include="Graphics\Line\PathDrawNode.cs" />
+    <Compile Include="Graphics\Lines\Path.cs" />
+    <Compile Include="Graphics\Lines\PathDrawNode.cs" />
     <Compile Include="Graphics\ProxyDrawable.cs" />
     <Compile Include="Graphics\Sprites\Box.cs" />
     <Compile Include="Graphics\OpenGL\Textures\TextureGLAtlas.cs" />
     <Compile Include="Graphics\OpenGL\Textures\TextureGLAtlasWhite.cs" />
     <Compile Include="Graphics\Sprites\Triangle.cs" />
-    <Compile Include="Graphics\Transformations\TransformGlowAlpha.cs" />
-    <Compile Include="Graphics\Transformations\TransformSize.cs" />
+    <Compile Include="Graphics\Transforms\TransformEdgeEffectAlpha.cs" />
+    <Compile Include="Graphics\Transforms\TransformSize.cs" />
     <Compile Include="Graphics\UserInterface\BasicSliderBar.cs" />
-    <Compile Include="Graphics\UserInterface\DropDownHeader.cs" />
-    <Compile Include="Graphics\UserInterface\DropDownMenu.cs" />
-    <Compile Include="Graphics\UserInterface\DropDownMenuItem.cs" />
+    <Compile Include="Graphics\UserInterface\DropdownHeader.cs" />
+    <Compile Include="Graphics\UserInterface\Dropdown.cs" />
+    <Compile Include="Graphics\UserInterface\DropdownMenuItem.cs" />
     <Compile Include="Graphics\UserInterface\PasswordTextBox.cs" />
     <Compile Include="Graphics\UserInterface\SliderBar.cs" />
     <Compile Include="Graphics\Visualisation\DrawVisualiser.cs" />
@@ -144,16 +167,16 @@
     <Compile Include="Graphics\Performance\PerformanceOverlay.cs" />
     <Compile Include="Graphics\Primitives\MarginPadding.cs" />
     <Compile Include="Graphics\Sprites\SpriteDrawNode.cs" />
-    <Compile Include="Graphics\Transformations\ITransform.cs" />
-    <Compile Include="Graphics\Transformations\TransformAlpha.cs" />
-    <Compile Include="Graphics\Transformations\TransformColour.cs" />
-    <Compile Include="Graphics\Transformations\TransformFloat.cs" />
-    <Compile Include="Graphics\Transformations\TransformPosition.cs" />
-    <Compile Include="Graphics\Transformations\TransformPositionX.cs" />
-    <Compile Include="Graphics\Transformations\TransformPositionY.cs" />
-    <Compile Include="Graphics\Transformations\TransformRotation.cs" />
-    <Compile Include="Graphics\Transformations\TransformVector.cs" />
-    <Compile Include="Graphics\Transformations\TransformScale.cs" />
+    <Compile Include="Graphics\Transforms\ITransform.cs" />
+    <Compile Include="Graphics\Transforms\TransformAlpha.cs" />
+    <Compile Include="Graphics\Transforms\TransformColour.cs" />
+    <Compile Include="Graphics\Transforms\TransformFloat.cs" />
+    <Compile Include="Graphics\Transforms\TransformPosition.cs" />
+    <Compile Include="Graphics\Transforms\TransformPositionX.cs" />
+    <Compile Include="Graphics\Transforms\TransformPositionY.cs" />
+    <Compile Include="Graphics\Transforms\TransformRotation.cs" />
+    <Compile Include="Graphics\Transforms\TransformVector.cs" />
+    <Compile Include="Graphics\Transforms\TransformScale.cs" />
     <Compile Include="Graphics\UserInterface\Button.cs" />
     <Compile Include="Graphics\UserInterface\TextBox.cs" />
     <Compile Include="Graphics\Visualisation\FlashyBox.cs" />
@@ -163,7 +186,7 @@
     <Compile Include="Graphics\Visualisation\VisualisedDrawable.cs" />
     <Compile Include="Input\IKeyboardState.cs" />
     <Compile Include="Input\IMouseState.cs" />
-    <Compile Include="Input\TextInputSource.cs" />
+    <Compile Include="Input\ITextInputSource.cs" />
     <Compile Include="IO\File\FileSafety.cs" />
     <Compile Include="IO\Network\FileWebRequest.cs" />
     <Compile Include="IO\Network\HttpMethod.cs" />
@@ -180,30 +203,27 @@
     <Compile Include="Configuration\BindableBool.cs" />
     <Compile Include="Configuration\BindableDouble.cs" />
     <Compile Include="Configuration\BindableInt.cs" />
-    <Compile Include="Configuration\ConfigManager.cs" />
     <Compile Include="Configuration\IBindable.cs" />
     <Compile Include="Configuration\IParseable.cs" />
-    <Compile Include="Configuration\IValueChangedObservable.cs" />
     <Compile Include="Audio\AudioManager.cs" />
-    <Compile Include="GameModes\GameMode.cs" />
+    <Compile Include="Screens\Screen.cs" />
     <Compile Include="Graphics\Sprites\Sprite.cs" />
     <Compile Include="Graphics\Sprites\SpriteText.cs" />
     <Compile Include="Graphics\Textures\PrefixTextureStore.cs" />
     <Compile Include="IO\AsyncBufferStream.cs" />
-    <Compile Include="Audio\Sample\AudioSample.cs" />
-    <Compile Include="Audio\Track\AudioTrack.cs" />
-    <Compile Include="Audio\Track\AudioTrackBass.cs" />
-    <Compile Include="Audio\Track\AudioTrackVirtual.cs" />
-    <Compile Include="BaseGame.cs" />
-    <Compile Include="Platform\BasicGameHost.cs" />
-    <Compile Include="Platform\BasicGameWindow.cs" />
+    <Compile Include="Audio\Sample\SampleChannel.cs" />
+    <Compile Include="Audio\Track\Track.cs" />
+    <Compile Include="Audio\Track\TrackBass.cs" />
+    <Compile Include="Audio\Track\TrackVirtual.cs" />
+    <Compile Include="Game.cs" />
+    <Compile Include="Platform\GameHost.cs" />
+    <Compile Include="Platform\GameWindow.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\Batches\LinearBatch.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\Batches\QuadBatch.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\Batches\VertexBatch.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\Containers\BufferedContainer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\Containers\Container.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\Drawable.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Graphics\Drawable_TransformationHelpers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\DrawInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\OpenGL\Buffers\FrameBuffer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\OpenGL\Buffers\LinearVertexBuffer.cs" />
@@ -227,8 +247,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\Shaders\ShaderPart.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\Shaders\Uniform.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Graphics\Shaders\UniformBase.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Graphics\Transformations\EasingTypes.cs" />
-    <Compile Include="Graphics\Transformations\Transform.cs" />
+    <Compile Include="Graphics\EasingTypes.cs" />
+    <Compile Include="Graphics\Transforms\Transform.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Lists\IHasLifetime.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Lists\LifetimeList.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MathUtils\Interpolation.cs" />
@@ -245,7 +265,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Timing\ThrottledFrameClock.cs" />
     <Compile Include="Graphics\Batches\IVertexBatch.cs" />
     <Compile Include="Graphics\Containers\FlowContainer.cs" />
-    <Compile Include="Graphics\Drawable_Interaction.cs" />
     <Compile Include="IO\Stores\CachedResourceStore.cs" />
     <Compile Include="IO\Stores\ChangeableResourceStore.cs" />
     <Compile Include="IO\Stores\DllResourceStore.cs" />
@@ -276,16 +295,12 @@
     <Compile Include="Allocation\InvokeOnDisposal.cs" />
     <Compile Include="Statistics\PerformanceMonitor.cs" />
     <Compile Include="Threading\Scheduler.cs" />
-    <Compile Include="Threading\SleepHandle.cs" />
-    <Compile Include="Threading\SleepScheduler.cs" />
     <Compile Include="Graphics\Textures\RawTexture.cs" />
     <Compile Include="Graphics\Textures\RawTextureLoaderStore.cs" />
-    <Compile Include="Platform\BasicStorage.cs" />
+    <Compile Include="Platform\Storage.cs" />
     <Compile Include="Platform\IpcChannel.cs" />
     <Compile Include="Platform\IpcMessage.cs" />
-    <Compile Include="Graphics\UserInterface\CheckBox.cs" />
-    <Compile Include="Graphics\UserInterface\BasicCheckBox.cs" />
-    <Compile Include="Timing\TimeInfo.cs" />
+    <Compile Include="Timing\FrameTimeInfo.cs" />
     <Compile Include="Allocation\DependencyContainer.cs" />
     <Compile Include="Allocation\BackgroundDependencyLoader.cs" />
     <Compile Include="Configuration\BindableNumber.cs" />

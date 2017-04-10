@@ -1,14 +1,14 @@
 ﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 
 namespace osu.Framework.Lists
 {
     public class SortedList<T> : List<T>
     {
-        public IComparer<T> Comparer { get; private set; }
+        public IComparer<T> Comparer { get; }
 
         public SortedList(IComparer<T> comparer)
         {
@@ -17,8 +17,8 @@ namespace osu.Framework.Lists
 
         public new int Add(T value)
         {
-            Debug.Assert(value != null);
-            Debug.Assert(value is T);
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
 
             int index = getAdditionIndex(value);
             Insert(index, value);
@@ -42,7 +42,7 @@ namespace osu.Framework.Lists
             if (index < 0)
                 index = ~index;
 
-            // Binary search is not guaranteed to give the last index 
+            // Binary search is not guaranteed to give the last index
             // when duplicates are involved, so let's move towards it
             for (; index < Count; index++)
             {

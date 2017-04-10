@@ -8,8 +8,8 @@ namespace osu.Framework.IO.Stores
 {
     public class FileSystemResourceStore : ChangeableResourceStore<byte[]>, IDisposable
     {
-        private FileSystemWatcher watcher;
-        private string directory;
+        private readonly FileSystemWatcher watcher;
+        private readonly string directory;
 
         private bool isDisposed;
 

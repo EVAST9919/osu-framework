@@ -6,32 +6,29 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using OpenTK;
 using OpenTK.Graphics;
-using osu.Framework.GameModes.Testing;
-using osu.Framework.Graphics.Colour;
-using osu.Framework.Graphics.Primitives;
+using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Graphics.OpenGL.Textures;
 using osu.Framework.Input;
-using System.Linq;
 using System.Collections.Generic;
+using osu.Framework.Testing;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseDrawablePath : TestCase
+    internal class TestCaseDrawablePath : TestCase
     {
-        public override string Name => @"Drawable Paths";
         public override string Description => @"Various cases of drawable paths.";
 
         public override void Reset()
         {
             base.Reset();
 
-            int width = 20;
+            const int width = 20;
             Texture gradientTexture = new Texture(width, 1, true);
             byte[] data = new byte[width * 4];
             for (int i = 0; i < width; ++i)
             {
-                float brightness = (float)i / (width-1);
+                float brightness = (float)i / (width - 1);
                 int index = i * 4;
                 data[index + 0] = (byte)(brightness * 255);
                 data[index + 1] = (byte)(brightness * 255);
@@ -40,12 +37,12 @@ namespace osu.Framework.VisualTests.Tests
             }
             gradientTexture.SetData(new TextureUpload(data));
 
-            Add(new Container()
+            Add(new Container
             {
                 RelativeSizeAxes = Axes.Both,
                 Children = new[]
                 {
-                    new FlowContainer
+                    new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.Both,
                         Children = new[]
@@ -153,7 +150,7 @@ namespace osu.Framework.VisualTests.Tests
             });
         }
 
-        class DrawablePath : Path
+        private class DrawablePath : Path
         {
             public override bool HandleInput => true;
 
@@ -177,11 +174,6 @@ namespace osu.Framework.VisualTests.Tests
 
                 return base.OnDrag(state);
             }
-        }
-
-        protected override void Update()
-        {
-            base.Update();
         }
     }
 }

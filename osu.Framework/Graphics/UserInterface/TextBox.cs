@@ -3,12 +3,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Caching;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.Transformations;
+using osu.Framework.Graphics.Transforms;
 using osu.Framework.Input;
 using osu.Framework.MathUtils;
 using osu.Framework.Threading;
@@ -17,13 +16,14 @@ using OpenTK.Graphics;
 using OpenTK.Input;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Configuration;
 using osu.Framework.Platform;
 
 namespace osu.Framework.Graphics.UserInterface
 {
-    public class TextBox : Container
+    public class TextBox : TabbableContainer, IHasCurrentValue<string>
     {
-        protected FlowContainer TextFlow;
+        protected FillFlowContainer TextFlow;
         protected Box Background;
         protected Box Caret;
         protected Container TextContainer;
@@ -35,10 +35,10 @@ namespace osu.Framework.Graphics.UserInterface
 
         public int? LengthLimit;
 
-        public bool AllowClipboardExport => true;
+        public virtual bool AllowClipboardExport => true;
 
         //represents the left/right selection coordinates of the word double clicked on when dragging
-        private int[] doubleClickWord = null;
+        private int[] doubleClickWord;
 
         private AudioManager audio;
 
@@ -58,10 +58,9 @@ namespace osu.Framework.Graphics.UserInterface
 
         public delegate void OnCommitHandler(TextBox sender, bool newText);
 
-        public event OnCommitHandler OnCommit;
-        public event OnCommitHandler OnChange;
+        public OnCommitHandler OnCommit;
 
-        private Scheduler textUpdateScheduler = new Scheduler();
+        private readonly Scheduler textUpdateScheduler = new Scheduler();
 
         public TextBox()
         {
@@ -94,19 +93,21 @@ namespace osu.Framework.Graphics.UserInterface
                             RelativeSizeAxes = Axes.Y,
                             Alpha = 0,
                         },
-                        TextFlow = new FlowContainer
+                        TextFlow = new FillFlowContainer
                         {
-                            Direction = FlowDirections.Horizontal,
+                            Direction = FillDirection.Horizontal,
                             AutoSizeAxes = Axes.X,
                             RelativeSizeAxes = Axes.Y,
                         },
                     },
                 },
             });
+
+            Current.ValueChanged += newValue => { Text = newValue; };
         }
 
         [BackgroundDependencyLoader]
-        private void load(BasicGameHost host, AudioManager audio)
+        private void load(GameHost host, AudioManager audio)
         {
             this.audio = audio;
 
@@ -120,9 +121,9 @@ namespace osu.Framework.Graphics.UserInterface
                     textUpdateScheduler.Add(() => onImeComposition(s));
                     cursorAndLayout.Invalidate();
                 };
-                textInput.OnNewImeResult += delegate (string s)
+                textInput.OnNewImeResult += delegate
                 {
-                    textUpdateScheduler.Add(() => onImeResult(s));
+                    textUpdateScheduler.Add(onImeResult);
                     cursorAndLayout.Invalidate();
                 };
             }
@@ -136,7 +137,6 @@ namespace osu.Framework.Graphics.UserInterface
 
         protected override void Dispose(bool isDisposing)
         {
-            OnChange = null;
             OnCommit = null;
 
             unbindInput();
@@ -160,7 +160,7 @@ namespace osu.Framework.Graphics.UserInterface
                 textUpdateScheduler.Update();
 
                 Vector2 cursorPos = Vector2.Zero;
-                if (text?.Length > 0)
+                if (text.Length > 0)
                     cursorPos.X = getPositionAt(selectionLeft);
 
                 float cursorPosEnd = getPositionAt(selectionEnd);
@@ -184,7 +184,7 @@ namespace osu.Framework.Graphics.UserInterface
 
                 if (HasFocus)
                 {
-                    Caret.ClearTransformations();
+                    Caret.ClearTransforms();
                     Caret.MoveTo(cursorPos, 60, EasingTypes.Out);
                     Caret.ScaleTo(new Vector2(cursorWidth, 1), 60, EasingTypes.Out);
 
@@ -209,7 +209,8 @@ namespace osu.Framework.Graphics.UserInterface
                     }
                 }
 
-                OnChange?.Invoke(this, textAtLastLayout != text);
+                if (textAtLastLayout != text)
+                    Current.Value = text;
                 if (textAtLastLayout.Length == 0 || text.Length == 0)
                     Placeholder.FadeTo(text.Length == 0 ? 1 : 0, 200);
 
@@ -233,7 +234,7 @@ namespace osu.Framework.Graphics.UserInterface
 
         private int getCharacterClosestTo(Vector2 pos)
         {
-            pos = TextFlow.ToLocalSpace(pos * DrawInfo.Matrix);
+            pos = Parent.ToSpaceOfOtherDrawable(pos, TextFlow);
 
             int i = 0;
             foreach (Drawable d in TextFlow.Children)
@@ -246,15 +247,15 @@ namespace osu.Framework.Graphics.UserInterface
             return i;
         }
 
-        int selectionStart;
-        int selectionEnd;
+        private int selectionStart;
+        private int selectionEnd;
 
-        int selectionLength => Math.Abs(selectionEnd - selectionStart);
+        private int selectionLength => Math.Abs(selectionEnd - selectionStart);
 
-        int selectionLeft => Math.Min(selectionStart, selectionEnd);
-        int selectionRight => Math.Max(selectionStart, selectionEnd);
+        private int selectionLeft => Math.Min(selectionStart, selectionEnd);
+        private int selectionRight => Math.Max(selectionStart, selectionEnd);
 
-        Cached<Vector2> cursorAndLayout = new Cached<Vector2>();
+        private Cached<Vector2> cursorAndLayout = new Cached<Vector2>();
 
         private void moveSelection(int offset, bool expand)
         {
@@ -398,11 +399,10 @@ namespace osu.Framework.Graphics.UserInterface
         public string PlaceholderText
         {
             get { return Placeholder.Text; }
-            set
-            {
-                Placeholder.Text = value;
-            }
+            set { Placeholder.Text = value; }
         }
+
+        public Bindable<string> Current { get; } = new Bindable<string>();
 
         private string text = string.Empty;
 
@@ -411,12 +411,15 @@ namespace osu.Framework.Graphics.UserInterface
             get { return text; }
             set
             {
-                Debug.Assert(value != null);
-
                 if (value == text)
                     return;
 
+                value = value ?? string.Empty;
+
                 Placeholder.FadeTo(value.Length == 0 ? 1 : 0);
+
+                if (!IsLoaded)
+                    Current.Value = text = value;
 
                 textUpdateScheduler.Add(delegate
                 {
@@ -466,7 +469,7 @@ namespace osu.Framework.Graphics.UserInterface
             switch (args.Key)
             {
                 case Key.Tab:
-                    return false;
+                    return base.OnKeyDown(state, args);
                 case Key.End:
                     moveSelection(text.Length, state.Keyboard.ShiftPressed);
                     return true;
@@ -633,7 +636,7 @@ namespace osu.Framework.Graphics.UserInterface
                 {
                     selectionStart = doubleClickWord[1];
                     selectionEnd = findSeparatorIndex(text, getCharacterClosestTo(state.Mouse.Position), -1);
-                    selectionEnd = selectionEnd >= 0 ? (selectionEnd + 1) : 0;
+                    selectionEnd = selectionEnd >= 0 ? selectionEnd + 1 : 0;
                 }
                 else
                 {
@@ -660,6 +663,9 @@ namespace osu.Framework.Graphics.UserInterface
         {
             if (HasFocus) return true;
 
+            if (!state.Mouse.PositionMouseDown.HasValue)
+                throw new ArgumentNullException(nameof(state.Mouse.PositionMouseDown));
+
             Vector2 posDiff = state.Mouse.PositionMouseDown.Value - state.Mouse.Position;
 
             return Math.Abs(posDiff.X) > Math.Abs(posDiff.Y);
@@ -671,16 +677,24 @@ namespace osu.Framework.Graphics.UserInterface
 
             if (text.Length == 0) return true;
 
-            int hover = Math.Min(text.Length - 1, getCharacterClosestTo(state.Mouse.Position));
+            if (AllowClipboardExport)
+            {
+                int hover = Math.Min(text.Length - 1, getCharacterClosestTo(state.Mouse.Position));
 
-            int lastSeparator = findSeparatorIndex(text, hover, -1);
-            int nextSeparator = findSeparatorIndex(text, hover, 1);
+                int lastSeparator = findSeparatorIndex(text, hover, -1);
+                int nextSeparator = findSeparatorIndex(text, hover, 1);
 
-            selectionStart = lastSeparator >= 0 ? lastSeparator + 1 : 0;
-            selectionEnd = nextSeparator >= 0 ? nextSeparator : text.Length;
+                selectionStart = lastSeparator >= 0 ? lastSeparator + 1 : 0;
+                selectionEnd = nextSeparator >= 0 ? nextSeparator : text.Length;
+            }
+            else
+            {
+                selectionStart = 0;
+                selectionEnd = text.Length;
+            }
 
             //in order to keep the home word selected
-            doubleClickWord = new int[] { selectionStart, selectionEnd };
+            doubleClickWord = new[] { selectionStart, selectionEnd };
 
             cursorAndLayout.Invalidate();
             return true;
@@ -720,13 +734,13 @@ namespace osu.Framework.Graphics.UserInterface
         {
             unbindInput();
 
-            Caret.ClearTransformations();
+            Caret.ClearTransforms();
             Caret.FadeOut(200);
 
             if (state.Keyboard.Keys.Contains(Key.Enter))
             {
                 Background.Colour = BackgroundUnfocused;
-                Background.ClearTransformations();
+                Background.ClearTransforms();
                 Background.FlashColour(BackgroundCommit, 400);
 
                 audio.Sample.Get(@"Keyboard/key-confirm")?.Play();
@@ -734,7 +748,7 @@ namespace osu.Framework.Graphics.UserInterface
             }
             else
             {
-                Background.ClearTransformations();
+                Background.ClearTransforms();
                 Background.FadeColour(BackgroundUnfocused, 200, EasingTypes.OutExpo);
             }
 
@@ -747,7 +761,7 @@ namespace osu.Framework.Graphics.UserInterface
 
             bindInput();
 
-            Background.ClearTransformations();
+            Background.ClearTransforms();
             Background.FadeColour(BackgroundFocused, 200, EasingTypes.Out);
 
             cursorAndLayout.Invalidate();
@@ -766,13 +780,11 @@ namespace osu.Framework.Graphics.UserInterface
             textInput.Activate(this);
         }
 
-        private void onImeResult(string s)
+        private void onImeResult()
         {
             //we only succeeded if there is pending data in the textbox
             if (imeDrawables.Count > 0)
             {
-                audio.Sample.Get(@"Keyboard/key-confirm")?.Play();
-
                 foreach (Drawable d in imeDrawables)
                 {
                     d.Colour = Color4.White;
@@ -783,7 +795,7 @@ namespace osu.Framework.Graphics.UserInterface
             imeDrawables.Clear();
         }
 
-        private List<Drawable> imeDrawables = new List<Drawable>();
+        private readonly List<Drawable> imeDrawables = new List<Drawable>();
 
         private void onImeComposition(string s)
         {

@@ -2,14 +2,12 @@
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using OpenTK;
+using OpenTK.Input;
 
 namespace osu.Framework.Input
 {
     public interface IMouseState
     {
-        bool BackButton { get; }
-        bool ForwardButton { get; }
-
         IMouseState NativeState { get; }
 
         Vector2 Delta { get; }
@@ -21,12 +19,14 @@ namespace osu.Framework.Input
 
         bool HasMainButtonPressed { get; }
 
-        bool LeftButton { get; }
-        bool MiddleButton { get; }
-        bool RightButton { get; }
+        bool IsPressed(MouseButton button);
+
+        void SetPressed(MouseButton button, bool pressed);
 
         int Wheel { get; }
 
         int WheelDelta { get; }
+
+        IMouseState Clone();
     }
 }

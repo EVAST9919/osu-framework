@@ -2,13 +2,14 @@
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using osu.Framework.Allocation;
-using osu.Framework.GameModes.Testing;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Cursor;
+using osu.Framework.Platform;
+using osu.Framework.Testing;
 
 namespace osu.Framework.VisualTests
 {
-    class VisualTestGame : BaseGame
+    internal class VisualTestGame : Game
     {
         [BackgroundDependencyLoader]
         private void load()
@@ -18,6 +19,13 @@ namespace osu.Framework.VisualTests
                 new TestBrowser(),
                 new CursorContainer(),
             };
+        }
+
+        public override void SetHost(GameHost host)
+        {
+            base.SetHost(host);
+
+            host.Window.CursorState = CursorState.Hidden;
         }
     }
 }

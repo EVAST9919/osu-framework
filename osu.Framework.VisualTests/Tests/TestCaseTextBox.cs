@@ -5,33 +5,31 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
 using OpenTK;
-using osu.Framework.GameModes.Testing;
 using osu.Framework.Graphics.Primitives;
+using osu.Framework.Testing;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseTextBox : TestCase
+    internal class TestCaseTextBox : TestCase
     {
-        public override string Name => @"TextBox";
-
         public override string Description => @"Text entry evolved";
 
         public override void Reset()
         {
             base.Reset();
 
-            FlowContainer textBoxes = new FlowContainer
+            FillFlowContainer textBoxes = new FillFlowContainer
             {
-                Direction = FlowDirections.Vertical,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 50),
                 Padding = new MarginPadding
                 {
                     Top = 50,
                 },
-                Spacing = new Vector2(0, 50),
                 Anchor = Anchor.TopCentre,
                 Origin = Anchor.TopCentre,
                 RelativeSizeAxes = Axes.Both,
-                Size = new Vector2(0.8f, 1)
+                Size = new Vector2(0.9f, 1)
             };
 
             Add(textBoxes);
@@ -39,25 +37,29 @@ namespace osu.Framework.VisualTests.Tests
             textBoxes.Add(new TextBox
             {
                 Size = new Vector2(100, 16),
+                TabbableContentContainer = textBoxes
             });
 
             textBoxes.Add(new TextBox
             {
                 Text = @"Limited length",
                 Size = new Vector2(200, 20),
-                LengthLimit = 20
+                LengthLimit = 20,
+                TabbableContentContainer = textBoxes
             });
 
             textBoxes.Add(new TextBox
             {
                 Text = @"Box with some more text",
                 Size = new Vector2(500, 30),
+                TabbableContentContainer = textBoxes
             });
 
             textBoxes.Add(new TextBox
             {
                 PlaceholderText = @"Placeholder text",
                 Size = new Vector2(500, 30),
+                TabbableContentContainer = textBoxes
             });
 
             textBoxes.Add(new TextBox
@@ -65,8 +67,72 @@ namespace osu.Framework.VisualTests.Tests
                 Text = @"prefilled placeholder",
                 PlaceholderText = @"Placeholder text",
                 Size = new Vector2(500, 30),
+                TabbableContentContainer = textBoxes
             });
 
+            FillFlowContainer otherTextBoxes = new FillFlowContainer
+            {
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 50),
+                Padding = new MarginPadding
+                {
+                    Top = 50,
+                    Left = 500
+                },
+                Anchor = Anchor.TopCentre,
+                Origin = Anchor.TopCentre,
+                RelativeSizeAxes = Axes.Both,
+                Size = new Vector2(0.8f, 1)
+            };
+
+            otherTextBoxes.Add(new TextBox
+            {
+                PlaceholderText = @"Textbox in separate container",
+                Size = new Vector2(500, 30),
+                TabbableContentContainer = otherTextBoxes
+            });
+
+            otherTextBoxes.Add(new PasswordTextBox
+            {
+                PlaceholderText = @"Password textbox",
+                Text = "Secret ;)",
+                Size = new Vector2(500, 30),
+                TabbableContentContainer = otherTextBoxes
+            });
+
+            FillFlowContainer nestedTextBoxes = new FillFlowContainer
+            {
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 50),
+                Margin = new MarginPadding { Left = 50 },
+                RelativeSizeAxes = Axes.Both,
+                Size = new Vector2(0.8f, 1)
+            };
+
+            nestedTextBoxes.Add(new TextBox
+            {
+                PlaceholderText = @"Nested textbox 1",
+                Size = new Vector2(457, 30),
+                TabbableContentContainer = otherTextBoxes
+            });
+
+            nestedTextBoxes.Add(new TextBox
+            {
+                PlaceholderText = @"Nested textbox 2",
+                Size = new Vector2(457, 30),
+                TabbableContentContainer = otherTextBoxes
+            });
+
+            nestedTextBoxes.Add(new TextBox
+            {
+                PlaceholderText = @"Nested textbox 3",
+                Size = new Vector2(457, 30),
+                TabbableContentContainer = otherTextBoxes
+            });
+
+            otherTextBoxes.Add(nestedTextBoxes);
+
+            Add(otherTextBoxes);
 
             //textBoxes.Add(tb = new PasswordTextBox(@"", 14, Vector2.Zero, 300));
         }

@@ -18,14 +18,14 @@ namespace osu.Framework.Desktop.Platform.Windows
         private static extern IntPtr GetClipboardData(uint uFormat);
 
         [DllImport("user32.dll")]
-        static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+        private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
 
         [DllImport("User32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool OpenClipboard(IntPtr hWndNewOwner);
 
         [DllImport("user32.dll")]
-        static extern bool EmptyClipboard();
+        private static extern bool EmptyClipboard();
 
         [DllImport("User32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -94,7 +94,7 @@ namespace osu.Framework.Desktop.Platform.Windows
             }
         }
 
-        public override void SetText(string text)
+        public override void SetText(string selectedText)
         {
             try
             {
@@ -103,9 +103,9 @@ namespace osu.Framework.Desktop.Platform.Windows
 
                 EmptyClipboard();
 
-                uint bytes = ((uint)text.Length + 1) * 2;
+                uint bytes = ((uint)selectedText.Length + 1) * 2;
 
-                var source = Marshal.StringToHGlobalUni(text);
+                var source = Marshal.StringToHGlobalUni(selectedText);
 
                 const int gmem_movable = 0x0002;
                 const int gmem_zeroinit = 0x0040;

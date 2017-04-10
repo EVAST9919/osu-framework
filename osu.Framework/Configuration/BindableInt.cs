@@ -2,7 +2,6 @@
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
-using System.Diagnostics;
 using System.Globalization;
 using OpenTK;
 
@@ -16,22 +15,26 @@ namespace osu.Framework.Configuration
             set { base.Value = MathHelper.Clamp(value, MinValue, MaxValue); }
         }
 
-        public BindableInt(int value = 0) : base(value)
+        public BindableInt(int value = 0)
+            : base(value)
         {
             MinValue = int.MinValue;
             MaxValue = int.MaxValue;
         }
-        
-        public override void Weld(Bindable<int> v, bool transferValue = true)
+
+        public override void BindTo(Bindable<int> them)
         {
-            var i = v as BindableInt;
+            var i = them as BindableInt;
             if (i != null)
             {
                 MinValue = Math.Max(MinValue, i.MinValue);
                 MaxValue = Math.Min(MaxValue, i.MaxValue);
-                Debug.Assert(MinValue <= MaxValue);
+                if (MinValue > MaxValue)
+                    throw new ArgumentOutOfRangeException(
+                        $"Can not weld bindable ints with non-overlapping min/max-ranges. The ranges were [{MinValue} - {MaxValue}] and [{i.MinValue} - {i.MaxValue}].", nameof(them));
             }
-            base.Weld(v, transferValue);
+
+            base.BindTo(them);
         }
 
         public override bool Parse(object s)

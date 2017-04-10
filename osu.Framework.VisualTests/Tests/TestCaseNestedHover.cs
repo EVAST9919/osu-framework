@@ -6,14 +6,13 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Input;
 using OpenTK;
 using OpenTK.Graphics;
-using osu.Framework.GameModes.Testing;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Testing;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseNestedHover : TestCase
+    internal class TestCaseNestedHover : TestCase
     {
-        public override string Name => @"Nested Hover";
         public override string Description => @"Hovering multiple nested elements";
 
         public override void Reset()
@@ -46,13 +45,13 @@ namespace osu.Framework.VisualTests.Tests
             });
         }
 
-        class HoverBox : Container
+        private class HoverBox : Container
         {
-            private Color4 normalColour;
-            private Color4 hoveredColour;
+            private readonly Color4 normalColour;
+            private readonly Color4 hoveredColour;
 
-            private Box box;
-            private bool propagateHover;
+            private readonly Box box;
+            private readonly bool propagateHover;
 
             public HoverBox(Color4 normalColour, Color4 hoveredColour, bool propagateHover = true)
             {

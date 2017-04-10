@@ -1,41 +1,40 @@
 ﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
-using osu.Framework.GameModes.Testing;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Testing;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseSpriteText : TestCase
+    internal class TestCaseSpriteText : TestCase
     {
-        public override string Name => @"SpriteText";
-
         public override string Description => @"Test all sizes of text rendering";
 
         public override void Reset()
         {
             base.Reset();
 
-            FlowContainer flow;
+            FillFlowContainer flow;
 
             Children = new Drawable[]
             {
                 new ScrollContainer
                 {
+                    RelativeSizeAxes = Axes.Both,
                     Children = new[]
                     {
-                        flow = new FlowContainer
+                        flow = new FillFlowContainer
                         {
                             Anchor = Anchor.TopLeft,
                             AutoSizeAxes = Axes.Both,
-                            Direction = FlowDirections.Vertical,
+                            Direction = FillDirection.Vertical,
                         }
                     }
                 }
             };
-            
+
             flow.Add(new SpriteText
             {
                 Text = @"the quick red fox jumps over the lazy brown dog"

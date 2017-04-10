@@ -5,16 +5,28 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Lists;
 using osu.Framework.Timing;
 using OpenTK;
+using osu.Framework.Graphics.Transforms;
+using System;
 
 namespace osu.Framework.Graphics
 {
     public interface IDrawable : IHasLifetime
     {
+        /// <summary>
+        /// Absolute size of this Drawable in the <see cref="Parent"/>'s coordinate system.
+        /// </summary>
         Vector2 DrawSize { get; }
 
+        /// <summary>
+        /// Contains a linear transformation, colour information, and blending information
+        /// of this drawable.
+        /// </summary>
         DrawInfo DrawInfo { get; }
 
-        IContainer Parent { get; set; }
+        /// <summary>
+        /// The parent of this drawable in the scene graph.
+        /// </summary>
+        IContainer Parent { get; }
 
         /// <summary>
         /// Whether this drawable is present for any sort of user-interaction.
@@ -23,8 +35,9 @@ namespace osu.Framework.Graphics
         /// </summary>
         bool IsPresent { get; }
 
-        FrameTimeInfo Time { get; }
-
+        /// <summary>
+        /// The clock of this drawable. Used for keeping track of time across frames.
+        /// </summary>
         IFrameBasedClock Clock { get; }
 
         /// <summary>
@@ -43,6 +56,20 @@ namespace osu.Framework.Graphics
         /// <returns>The output position.</returns>
         Vector2 ToLocalSpace(Vector2 screenSpacePos);
 
+        /// <summary>
+        /// Determines how this Drawable is blended with other already drawn Drawables.
+        /// </summary>
         BlendingMode BlendingMode { get; }
+
+        /// <summary>
+        /// Applies a transform to this drawable object.
+        /// </summary>
+        /// <typeparam name="TValue">The value type upon which the transform acts.</typeparam>
+        /// <param name="startValue">The value to transform from.</param>
+        /// <param name="newValue">The value to transform to.</param>
+        /// <param name="duration">The transform duration.</param>
+        /// <param name="easing">The transform easing.</param>
+        /// <param name="transform">The transform to use.</param>
+        void TransformTo<TValue>(TValue startValue, TValue newValue, double duration, EasingTypes easing, Transform<TValue> transform) where TValue : struct, IEquatable<TValue>;
     }
 }

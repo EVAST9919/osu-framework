@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Text;
 using osu.Framework.Graphics.OpenGL;
 using OpenTK.Graphics.ES30;
-using System.Diagnostics;
 
 namespace osu.Framework.Graphics.Shaders
 {
@@ -16,15 +15,15 @@ namespace osu.Framework.Graphics.Shaders
         internal bool Loaded;
         internal bool IsBound;
 
-        private string name;
+        private readonly string name;
         private int programID = -1;
 
-        private static List<Shader> allShaders = new List<Shader>();
-        private static Dictionary<string, object> globalProperties = new Dictionary<string, object>();
+        private static readonly List<Shader> all_shaders = new List<Shader>();
+        private static readonly Dictionary<string, object> global_properties = new Dictionary<string, object>();
 
-        private Dictionary<string, UniformBase> uniforms = new Dictionary<string, UniformBase>();
+        private readonly Dictionary<string, UniformBase> uniforms = new Dictionary<string, UniformBase>();
         private UniformBase[] uniformsArray;
-        private List<ShaderPart> parts;
+        private readonly List<ShaderPart> parts;
 
         internal Shader(string name, List<ShaderPart> parts)
         {
@@ -54,7 +53,7 @@ namespace osu.Framework.Graphics.Shaders
                 GLWrapper.DeleteProgram(this);
                 Loaded = false;
                 programID = -1;
-                allShaders.Remove(this);
+                all_shaders.Remove(this);
             }
         }
 
@@ -93,7 +92,7 @@ namespace osu.Framework.Graphics.Shaders
             string linkLog = GL.GetProgramInfoLog(this);
 
             Log.AppendLine(string.Format(ShaderPart.BOUNDARY, name));
-            Log.AppendLine(string.Format("Linked: {0}", linkResult == 1));
+            Log.AppendLine($"Linked: {linkResult == 1}");
             if (linkResult == 0)
             {
                 Log.AppendLine("Log:");
@@ -126,14 +125,14 @@ namespace osu.Framework.Graphics.Shaders
                     uniforms.Add(strName, uniformsArray[i]);
                 }
 
-                foreach (KeyValuePair<string, object> kvp in globalProperties)
+                foreach (KeyValuePair<string, object> kvp in global_properties)
                 {
                     if (!uniforms.ContainsKey(kvp.Key))
                         continue;
                     uniforms[kvp.Key].Value = kvp.Value;
                 }
 
-                allShaders.Add(this);
+                all_shaders.Add(this);
             }
         }
 
@@ -177,7 +176,8 @@ namespace osu.Framework.Graphics.Shaders
         public Uniform<T> GetUniform<T>(string name)
         {
             ensureLoaded();
-            Debug.Assert(uniforms.ContainsKey(name), string.Format(@"Inexisting uniform {0} in shader {1}.", name, this.name));
+            if (!uniforms.ContainsKey(name))
+                throw new ArgumentException($"Uniform {name} does not exist in shader {this.name}.", nameof(name));
             return new Uniform<T>(uniforms[name]);
         }
 
@@ -189,13 +189,13 @@ namespace osu.Framework.Graphics.Shaders
         /// <param name="value">The uniform value.</param>
         public static void SetGlobalProperty(string name, object value)
         {
-            globalProperties[name] = value;
+            global_properties[name] = value;
 
-            for (int i = 0; i < allShaders.Count; i++)
+            foreach (Shader shader in all_shaders)
             {
-                allShaders[i].ensureLoaded();
-                if (allShaders[i].uniforms.ContainsKey(name))
-                    allShaders[i].uniforms[name].Value = value;
+                shader.ensureLoaded();
+                if (shader.uniforms.ContainsKey(name))
+                    shader.uniforms[name].Value = value;
             }
         }
 

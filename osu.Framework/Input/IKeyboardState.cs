@@ -11,11 +11,14 @@ namespace osu.Framework.Input
         bool AltPressed { get; }
         bool ControlPressed { get; }
         bool ShiftPressed { get; }
+
         /// <summary>
         /// Win key on Windows, or Command key on Mac.
         /// </summary>
         bool SuperPressed { get; }
 
-        IEnumerable<Key> Keys { get; }
+        IEnumerable<Key> Keys { get; set; }
+
+        IKeyboardState Clone();
     }
 }

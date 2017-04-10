@@ -4,18 +4,17 @@
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Testing;
 using OpenTK;
 using OpenTK.Graphics;
-using osu.Framework.GameModes.Testing;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseSmoothedEdges : TestCase
+    internal class TestCaseSmoothedEdges : TestCase
     {
-        public override string Name => @"Smoothed Edges";
         public override string Description => @"Boxes with automatically smoothed edges (no anti-aliasing).";
 
-        private Box[] boxes = new Box[4];
+        private readonly Box[] boxes = new Box[4];
 
         public override void Reset()
         {
@@ -26,10 +25,10 @@ namespace osu.Framework.VisualTests.Tests
                 RelativeSizeAxes = Axes.Both,
                 Children = new[]
                 {
-                    new FlowContainer
+                    new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Children = new []
+                        Children = new[]
                         {
                             new Container
                             {
@@ -129,7 +128,7 @@ namespace osu.Framework.VisualTests.Tests
         {
             base.Update();
 
-            foreach (Drawable box in boxes)
+            foreach (Box box in boxes)
                 box.Rotation += 0.01f;
         }
     }

@@ -7,18 +7,18 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Platform;
-using OpenTK;
 using osu.Framework.Desktop.Input;
 using osu.Framework.Input;
 
 namespace osu.Framework.Desktop.Platform
 {
-    public abstract class DesktopGameHost : BasicGameHost
+    public abstract class DesktopGameHost : GameHost
     {
-        private TcpIpcProvider ipcProvider;
-        private Task ipcTask;
+        private readonly TcpIpcProvider ipcProvider;
+        private readonly Task ipcTask;
 
-        public DesktopGameHost(string gameName = @"", bool bindIPCPort = false) : base(gameName)
+        protected DesktopGameHost(string gameName = @"", bool bindIPCPort = false)
+            : base(gameName)
         {
             //todo: yeah.
             Architecture.SetIncludePath();
@@ -39,8 +39,8 @@ namespace osu.Framework.Desktop.Platform
                 IsPrimaryInstance = ipcProvider.Bind();
                 if (IsPrimaryInstance)
                 {
-                    ipcProvider.MessageReceived += msg => OnMessageReceived(msg);
-                    ipcTask = ipcProvider.Start();
+                    ipcProvider.MessageReceived += OnMessageReceived;
+                    ipcTask = Task.Factory.StartNew(ipcProvider.StartAsync, TaskCreationOptions.LongRunning);
                 }
             }
         }
@@ -51,7 +51,7 @@ namespace osu.Framework.Desktop.Platform
         private void ensureShadowCopy()
         {
             string exe = System.Reflection.Assembly.GetEntryAssembly().Location;
-            if (exe.Contains(@"_shadow"))
+            if (exe != null && exe.Contains(@"_shadow"))
             {
                 //we are already running a shadow copy. monitor the original executable path for changes.
                 exe = exe.Replace(@"_shadow", @"");
@@ -70,7 +70,9 @@ namespace osu.Framework.Desktop.Platform
                 return;
             }
 
-            string shadowExe = exe.Replace(@".exe", @"_shadow.exe");
+            string shadowExe = exe?.Replace(@".exe", @"_shadow.exe");
+
+            if (shadowExe == null) return;
 
             int attempts = 5;
             while (attempts-- > 0)
@@ -92,21 +94,9 @@ namespace osu.Framework.Desktop.Platform
 
         public override ITextInputSource GetTextInput() => Window == null ? null : new GameWindowTextInput(Window);
 
-        protected override void LoadGame(BaseGame game)
+        public override async Task SendMessageAsync(IpcMessage message)
         {
-            //delay load until we have a size.
-            if (Size == Vector2.Zero)
-            {
-                UpdateThread.Scheduler.Add(delegate { LoadGame(game); });
-                return;
-            }
-
-            base.LoadGame(game);
-        }
-
-        public override async Task SendMessage(IpcMessage message)
-        {
-            await ipcProvider.SendMessage(message);
+            await ipcProvider.SendMessageAsync(message);
         }
 
         protected override void Dispose(bool isDisposing)

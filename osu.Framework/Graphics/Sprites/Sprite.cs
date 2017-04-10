@@ -6,7 +6,6 @@ using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Textures;
 using OpenTK;
 using osu.Framework.Graphics.Shaders;
-using System.Diagnostics;
 using osu.Framework.Allocation;
 
 namespace osu.Framework.Graphics.Sprites
@@ -16,7 +15,7 @@ namespace osu.Framework.Graphics.Sprites
         private Shader textureShader;
         private Shader roundedTextureShader;
 
-        public bool WrapTexture = false;
+        public bool WrapTexture;
 
         public const int MAX_EDGE_SMOOTHNESS = 2;
 
@@ -50,7 +49,7 @@ namespace osu.Framework.Graphics.Sprites
 
         protected override void ApplyDrawNode(DrawNode node)
         {
-            SpriteDrawNode n = node as SpriteDrawNode;
+            SpriteDrawNode n = (SpriteDrawNode)node;
 
             n.ScreenSpaceDrawQuad = ScreenSpaceDrawQuad;
             n.DrawRectangle = DrawRectangle;
@@ -93,6 +92,7 @@ namespace osu.Framework.Graphics.Sprites
         }
 
         private Vector2 inflationAmount;
+
         protected override Quad ComputeScreenSpaceDrawQuad()
         {
             if (EdgeSmoothness == Vector2.Zero)
@@ -100,56 +100,23 @@ namespace osu.Framework.Graphics.Sprites
                 inflationAmount = Vector2.Zero;
                 return base.ComputeScreenSpaceDrawQuad();
             }
-            else
-            {
-                Debug.Assert(
-                    EdgeSmoothness.X <= MAX_EDGE_SMOOTHNESS &&
-                    EdgeSmoothness.Y <= MAX_EDGE_SMOOTHNESS,
-                    $@"May not smooth more than {MAX_EDGE_SMOOTHNESS} or will leak neighboring textures in atlas.");
 
-                Vector3 scale = DrawInfo.MatrixInverse.ExtractScale();
+            if (EdgeSmoothness.X > MAX_EDGE_SMOOTHNESS || EdgeSmoothness.Y > MAX_EDGE_SMOOTHNESS)
+                throw new InvalidOperationException(
+                    $"May not smooth more than {MAX_EDGE_SMOOTHNESS} or will leak neighboring textures in atlas. Tried to smooth by ({EdgeSmoothness.X}, {EdgeSmoothness.Y}).");
 
-                inflationAmount = new Vector2(scale.X * EdgeSmoothness.X, scale.Y * EdgeSmoothness.Y);
-                return ToScreenSpace(DrawRectangle.Inflate(inflationAmount));
-            }
+            Vector3 scale = DrawInfo.MatrixInverse.ExtractScale();
+
+            inflationAmount = new Vector2(scale.X * EdgeSmoothness.X, scale.Y * EdgeSmoothness.Y);
+            return ToScreenSpace(DrawRectangle.Inflate(inflationAmount));
         }
 
         public override string ToString()
         {
-            return base.ToString() + $" tex: {texture?.AssetName}";
+            string result = base.ToString();
+            if (!string.IsNullOrEmpty(texture?.AssetName))
+                result += $" tex: {texture?.AssetName}";
+            return result;
         }
-
-        public FillMode FillMode { get; set; }
-
-        protected override Vector2 DrawScale
-        {
-            get
-            {
-                Vector2 modifier = Vector2.One;
-
-                switch (FillMode)
-                {
-                    case FillMode.Fill:
-                        modifier = new Vector2(Math.Max(Parent.DrawSize.X / DrawWidth, Parent.DrawSize.Y / DrawHeight));
-                        break;
-                    case FillMode.Fit:
-                        modifier = new Vector2(Math.Min(Parent.DrawSize.X / DrawWidth, Parent.DrawSize.Y / DrawHeight));
-                        break;
-                    case FillMode.Stretch:
-                        modifier = new Vector2(Parent.DrawSize.X / DrawWidth, Parent.DrawSize.Y / DrawHeight);
-                        break;
-                }
-
-                return base.DrawScale * modifier;
-            }
-        }
-    }
-
-    public enum FillMode
-    {
-        None,
-        Fill,
-        Fit,
-        Stretch
     }
 }

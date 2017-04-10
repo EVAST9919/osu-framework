@@ -1,26 +1,17 @@
 ﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
-using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Configuration;
-using osu.Framework.Threading;
-using osu.Framework.DebugUtils;
 
 namespace osu.Framework.Audio
 {
-    public class AdjustableAudioComponent : IDisposable, IUpdateable
+    public class AdjustableAudioComponent : AudioComponent
     {
-        private List<BindableDouble> volumeAdjustments = new List<BindableDouble>();
-        private List<BindableDouble> balanceAdjustments = new List<BindableDouble>();
-        private List<BindableDouble> frequencyAdjustments = new List<BindableDouble>();
-
-        /// <summary>
-        /// Audio operations will be run on a separate dedicated thread, so we need to schedule any audio API calls using this queue.
-        /// </summary>
-        protected ConcurrentQueue<Action> PendingActions = new ConcurrentQueue<Action>();
+        private readonly List<BindableDouble> volumeAdjustments = new List<BindableDouble>();
+        private readonly List<BindableDouble> balanceAdjustments = new List<BindableDouble>();
+        private readonly List<BindableDouble> frequencyAdjustments = new List<BindableDouble>();
 
         /// <summary>
         /// Global volume of this component.
@@ -40,13 +31,13 @@ namespace osu.Framework.Audio
         /// <summary>
         /// Playback balance of this sample (-1 .. 1 where 0 is centered)
         /// </summary>
-        public readonly BindableDouble Balance = new BindableDouble(0)
+        public readonly BindableDouble Balance = new BindableDouble
         {
             MinValue = -1,
             MaxValue = 1
         };
 
-        protected readonly BindableDouble BalanceCalculated = new BindableDouble(0)
+        protected readonly BindableDouble BalanceCalculated = new BindableDouble
         {
             MinValue = -1,
             MaxValue = 1
@@ -59,24 +50,19 @@ namespace osu.Framework.Audio
 
         protected readonly BindableDouble FrequencyCalculated = new BindableDouble(1);
 
-        protected AdjustableAudioComponent(Scheduler scheduler = null)
+        protected AdjustableAudioComponent()
         {
             Volume.ValueChanged += InvalidateState;
             Balance.ValueChanged += InvalidateState;
             Frequency.ValueChanged += InvalidateState;
         }
 
-        ~AdjustableAudioComponent()
+        internal void InvalidateState(double newValue = 0)
         {
-            Dispose(false);
+            PendingActions.Enqueue(OnStateChanged);
         }
 
-        protected void InvalidateState(object sender = null, EventArgs e = null)
-        {
-            PendingActions.Enqueue(() => OnStateChanged(this, null));
-        }
-
-        protected virtual void OnStateChanged(object sender, EventArgs e)
+        internal virtual void OnStateChanged()
         {
             VolumeCalculated.Value = volumeAdjustments.Aggregate(Volume.Value, (current, adj) => current * adj);
             BalanceCalculated.Value = balanceAdjustments.Aggregate(Balance.Value, (current, adj) => current + adj);
@@ -112,8 +98,6 @@ namespace osu.Framework.Audio
                     break;
             }
 
-            adjustBindable.ValueChanged += InvalidateState;
-
             InvalidateState();
         }
 
@@ -123,55 +107,17 @@ namespace osu.Framework.Audio
             frequencyAdjustments.Remove(adjustBindable);
             volumeAdjustments.Remove(adjustBindable);
 
-            adjustBindable.ValueChanged -= InvalidateState;
-
             InvalidateState();
         }
 
-        public virtual void Update()
+        protected override void Dispose(bool disposing)
         {
-            ThreadSafety.EnsureNotUpdateThread();
+            volumeAdjustments.Clear();
+            balanceAdjustments.Clear();
+            frequencyAdjustments.Clear();
 
-            Action action;
-            while (PendingActions.TryDequeue(out action))
-                action();
+            base.Dispose(disposing);
         }
-
-        #region IDisposable Support
-
-        protected bool IsDisposed; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            PendingActions.Enqueue(() =>
-            {
-                if (!IsDisposed)
-                {
-                    IsDisposed = true;
-
-                    if (disposing)
-                    {
-                        foreach (var d in volumeAdjustments)
-                            d.ValueChanged -= InvalidateState;
-                        foreach (var d in balanceAdjustments)
-                            d.ValueChanged -= InvalidateState;
-                        foreach (var d in frequencyAdjustments)
-                            d.ValueChanged -= InvalidateState;
-                    }
-
-                    // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
-                    // TODO: set large fields to null.
-                }
-            });
-        }
-
-        // This code added to correctly implement the disposable pattern.
-        public void Dispose()
-        {
-            Dispose(true);
-        }
-
-        #endregion
     }
 
     public enum AdjustableProperty

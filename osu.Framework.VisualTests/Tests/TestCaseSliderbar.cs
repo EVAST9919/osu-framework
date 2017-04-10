@@ -1,21 +1,17 @@
 ﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
-using System;
 using osu.Framework.Configuration;
-using osu.Framework.GameModes.Testing;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Testing;
 using OpenTK;
 using OpenTK.Graphics;
-using osu.Framework.Graphics;
-using osu.Framework.Graphics.Transformations;
 
 namespace osu.Framework.VisualTests.Tests
 {
     public class TestCaseSliderbar : TestCase
     {
-        public override string Name => @"Sliderbar";
         public override string Description => @"Sliderbar tests.";
         private SliderBar<double> sliderBar;
         private BindableDouble sliderBarValue;
@@ -41,16 +37,17 @@ namespace osu.Framework.VisualTests.Tests
             {
                 Size = new Vector2(200, 10),
                 Position = new Vector2(25, 25),
-                Bindable = sliderBarValue,
                 Color = Color4.White,
                 SelectionColor = Color4.Pink,
                 KeyboardStep = 1
             };
 
+            sliderBar.Current.BindTo(sliderBarValue);
+
             Add(sliderBar);
             Add(sliderbarText);
 
-            Add(new BasicSliderBar<double>
+            Add(sliderBar = new BasicSliderBar<double>
             {
                 Size = new Vector2(200, 10),
                 RangePadding = 20,
@@ -58,13 +55,14 @@ namespace osu.Framework.VisualTests.Tests
                 Color = Color4.White,
                 SelectionColor = Color4.Pink,
                 KeyboardStep = 1,
-                Bindable = sliderBarValue,
             });
+
+            sliderBar.Current.BindTo(sliderBarValue);
         }
 
-        private void sliderBarValueChanged(object sender, EventArgs e)
+        private void sliderBarValueChanged(double newValue)
         {
-            sliderbarText.Text = $"Selected value: {sliderBarValue.Value:N}";
+            sliderbarText.Text = $"Selected value: {newValue:N}";
         }
     }
 }

@@ -23,14 +23,14 @@ namespace osu.Framework.Graphics.Sprites
             q.BottomLeft,
             q.BottomRight);
 
-        public override bool Contains(Vector2 screenSpacePos)
+        protected override bool InternalContains(Vector2 screenSpacePos)
         {
             return toTriangle(ScreenSpaceDrawQuad).Contains(screenSpacePos);
         }
 
         protected override DrawNode CreateDrawNode() => new TriangleDrawNode();
 
-        class TriangleDrawNode : SpriteDrawNode
+        private class TriangleDrawNode : SpriteDrawNode
         {
             protected override void Blit(Action<TexturedVertex2D> vertexAction)
             {

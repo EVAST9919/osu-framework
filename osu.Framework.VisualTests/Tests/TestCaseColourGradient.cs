@@ -6,18 +6,16 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using OpenTK;
 using OpenTK.Graphics;
-using osu.Framework.GameModes.Testing;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics.Colour;
+using osu.Framework.Testing;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseColourGradient : TestCase
+    internal class TestCaseColourGradient : TestCase
     {
-        public override string Name => @"Colour Gradient";
         public override string Description => @"Various cases of colour gradients.";
 
-        private Box[] boxes = new Box[4];
+        private readonly Box[] boxes = new Box[4];
 
         public override void Reset()
         {
@@ -25,30 +23,30 @@ namespace osu.Framework.VisualTests.Tests
 
             Color4 transparentBlack = new Color4(0, 0, 0, 0);
 
-            ColourInfo[] colours = new[]
+            ColourInfo[] colours =
             {
-                new ColourInfo()
+                new ColourInfo
                 {
                     TopLeft = Color4.White,
                     BottomLeft = Color4.Blue,
                     TopRight = Color4.Red,
                     BottomRight = Color4.Green,
                 },
-                new ColourInfo()
+                new ColourInfo
                 {
                     TopLeft = Color4.White,
                     BottomLeft = Color4.White,
                     TopRight = Color4.Black,
                     BottomRight = Color4.Black,
                 },
-                new ColourInfo()
+                new ColourInfo
                 {
                     TopLeft = Color4.White,
                     BottomLeft = Color4.White,
                     TopRight = Color4.Transparent,
                     BottomRight = Color4.Transparent,
                 },
-                new ColourInfo()
+                new ColourInfo
                 {
                     TopLeft = Color4.White,
                     BottomLeft = Color4.White,
@@ -57,12 +55,12 @@ namespace osu.Framework.VisualTests.Tests
                 },
             };
 
-            Add(new Container()
+            Add(new Container
             {
                 RelativeSizeAxes = Axes.Both,
                 Children = new[]
                 {
-                    new FlowContainer
+                    new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.Both,
                         Children = new[]
@@ -168,7 +166,7 @@ namespace osu.Framework.VisualTests.Tests
         {
             base.Update();
 
-            foreach (Drawable box in boxes)
+            foreach (Box box in boxes)
                 box.Rotation += 0.01f;
         }
     }

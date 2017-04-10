@@ -32,7 +32,9 @@ namespace osu.Framework.Graphics.Containers
 
             base.LoadComplete();
         }
+
         private Visibility state;
+
         public Visibility State
         {
             get { return state; }
@@ -66,6 +68,8 @@ namespace osu.Framework.Graphics.Containers
         public override void Show() => State = Visibility.Visible;
 
         public void ToggleVisibility() => State = State == Visibility.Visible ? Visibility.Hidden : Visibility.Visible;
+
+        public override bool HandleInput => State == Visibility.Visible;
 
         protected override bool OnHover(InputState state) => BlockPassThroughInput;
 

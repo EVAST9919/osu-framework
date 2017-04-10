@@ -5,39 +5,33 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Caching;
-using osu.Framework.Graphics.Transformations;
 using OpenTK;
 
 namespace osu.Framework.Graphics.Containers
 {
-    public class FlowContainer : FlowContainer<Drawable>
-    { }
-
-    public class FlowContainer<T> : Container<T>
+    /// <summary>
+    /// A container that can be used to fluently arrange its children.
+    /// </summary>
+    public abstract class FlowContainer<T> : Container<T>
         where T : Drawable
     {
         internal event Action OnLayout;
 
+        /// <summary>
+        /// The easing that should be used when children are moved to their position in the layout.
+        /// </summary>
         public EasingTypes LayoutEasing
         {
-            get
-            {
-                return AutoSizeEasing;
-            }
-
-            set
-            {
-                AutoSizeEasing = value;
-            }
+            get { return AutoSizeEasing; }
+            set { AutoSizeEasing = value; }
         }
 
+        /// <summary>
+        /// The time it should take to move a child from its current position to its new layout position.
+        /// </summary>
         public float LayoutDuration
         {
-            get
-            {
-                return AutoSizeDuration * 2;
-            }
-
+            get { return AutoSizeDuration * 2; }
             set
             {
                 //coupling with autosizeduration allows us to smoothly transition our size
@@ -48,24 +42,13 @@ namespace osu.Framework.Graphics.Containers
 
         private Cached layout = new Cached();
 
-        private FlowDirections direction = FlowDirections.Both;
+        protected void InvalidateLayout() => layout.Invalidate();
 
-        public FlowDirections Direction
-        {
-            get { return direction; }
-            set
-            {
-                if (value == direction) return;
-                direction = value;
-
-                layout.Invalidate();
-            }
-        }
-
-        Vector2 maximumSize;
+        private Vector2 maximumSize;
 
         /// <summary>
-        /// Optional maximum dimensions for this container.
+        /// Optional maximum dimensions for this container. Note that the meaning of this value can change
+        /// depending on the implementation.
         /// </summary>
         public Vector2 MaximumSize
         {
@@ -79,43 +62,12 @@ namespace osu.Framework.Graphics.Containers
             }
         }
 
-        /// <summary>
-        /// Pixel spacing added between our Children
-        /// </summary>
-        Vector2 spacing;
-        public Vector2 Spacing
-        {
-            get { return spacing; }
-            set
-            {
-                if (spacing == value) return;
-
-                spacing = value;
-                Invalidate(Invalidation.Geometry);
-            }
-        }
-
-        public void TransformSpacingTo(Vector2 newSpacing, double duration = 0, EasingTypes easing = EasingTypes.None)
-        {
-            UpdateTransformsOfType(typeof(TransformSpacing));
-            TransformVectorTo(spacing, newSpacing, duration, easing, new TransformSpacing());
-        }
-
-        public class TransformSpacing : TransformVector
-        {
-            public override void Apply(Drawable d)
-            {
-                base.Apply(d);
-                FlowContainer t = d as FlowContainer;
-
-                t.Spacing = CurrentValue;
-            }
-        }
+        protected override bool RequiresChildrenUpdate => base.RequiresChildrenUpdate || !layout.IsValid;
 
         public override bool Invalidate(Invalidation invalidation = Invalidation.All, Drawable source = null, bool shallPropagate = true)
         {
             if ((invalidation & Invalidation.SizeInParentSpace) > 0)
-                layout.Invalidate();
+                InvalidateLayout();
 
             return base.Invalidate(invalidation, source, shallPropagate);
         }
@@ -125,20 +77,24 @@ namespace osu.Framework.Graphics.Containers
             bool changed = base.UpdateChildrenLife();
 
             if (changed)
-                layout.Invalidate();
+                InvalidateLayout();
 
             return changed;
         }
 
-        public override void InvalidateFromChild(Invalidation invalidation, IDrawable source)
+        public override void InvalidateFromChild(Invalidation invalidation)
         {
-            if ((invalidation & Invalidation.SizeInParentSpace) > 0)
-                layout.Invalidate();
+            //Colour captures potential changes in IsPresent. If this ever becomes a bottleneck,
+            //Invalidation could be further separated into presence changes.
+            if ((invalidation & (Invalidation.SizeInParentSpace | Invalidation.Colour)) > 0)
+                InvalidateLayout();
 
-            base.InvalidateFromChild(invalidation, source);
+            base.InvalidateFromChild(invalidation);
         }
 
-        protected virtual IEnumerable<T> SortedChildren => AliveChildren;
+        protected virtual IEnumerable<T> FlowingChildren => AliveInternalChildren.Where(d => d.IsPresent);
+
+        protected abstract IEnumerable<Vector2> ComputeLayoutPositions();
 
         protected override void UpdateAfterChildren()
         {
@@ -150,62 +106,38 @@ namespace osu.Framework.Graphics.Containers
                 {
                     OnLayout?.Invoke();
 
-                    if (Children.FirstOrDefault() == null) return;
+                    if (!Children.Any())
+                        return;
 
-                    Vector2 current = Vector2.Zero;
+                    var positions = ComputeLayoutPositions().ToArray();
 
-                    Vector2 max = maximumSize;
-                    if (direction == FlowDirections.Both && maximumSize == Vector2.Zero)
+                    int i = 0;
+                    foreach (var d in FlowingChildren)
                     {
-                        var s = DrawSize;
+                        if (i > positions.Length)
+                            throw new InvalidOperationException(
+                                $"{GetType().FullName}.{nameof(ComputeLayoutPositions)} returned a total of {positions.Length} positions for {i} children. {nameof(ComputeLayoutPositions)} must return 1 position per child.");
 
-                        //If we are autosize and haven't specified a maximum size, we should allow infinite expansion.
-                        //If we are inheriting then we need to use the parent size (our ActualSize).
-                        max.X = (AutoSizeAxes & Axes.X) > 0 ? float.MaxValue : s.X;
-                        max.Y = (AutoSizeAxes & Axes.Y) > 0 ? float.MaxValue : s.Y;
+                        if ((d.RelativeSizeAxes & AutoSizeAxes) != 0)
+                            throw new InvalidOperationException(
+                                "Drawables inside a flow container may not have a relative size axis that the flow container is auto sizing for." +
+                                $"The flow container is set to autosize in {AutoSizeAxes} axes and the child is set to relative size in {d.RelativeSizeAxes} axes.");
+
+                        if (d.RelativePositionAxes != Axes.None)
+                            throw new InvalidOperationException($"A flow container cannot contain a child with relative positioning (it is {d.RelativePositionAxes}).");
+
+                        var finalPos = positions[i];
+                        if (d.Position != finalPos)
+                            d.MoveTo(finalPos, LayoutDuration, LayoutEasing);
+
+                        ++i;
                     }
 
-                    float rowMaxHeight = 0;
-                    foreach (Drawable d in SortedChildren)
-                    {
-                        Vector2 size = Vector2.Zero;
-
-                        if (d.IsPresent)
-                        {
-                            size = d.LayoutSize * d.Scale;
-
-                            //We've exceeded our allowed width, move to a new row
-                            if (Direction != FlowDirections.Horizontal && current.X + size.X > max.X)
-                            {
-                                current.X = 0;
-                                current.Y += rowMaxHeight;
-
-                                rowMaxHeight = 0;
-                            }
-
-                            //todo: check this is correct
-                            if (size.X > 0) size.X = Math.Max(0, size.X + Spacing.X);
-                            if (size.Y > 0) size.Y = Math.Max(0, size.Y + Spacing.Y);
-
-                            if (size.Y > rowMaxHeight) rowMaxHeight = size.Y;
-                        }
-
-                        if (current != d.DrawPosition)
-                            d.MoveTo(current, LayoutDuration, LayoutEasing);
-
-                        current.X += size.X;
-                    }
+                    if (i != positions.Length)
+                        throw new InvalidOperationException(
+                            $"{GetType().FullName}.{nameof(ComputeLayoutPositions)} returned a total of {positions.Length} positions for {i} children. {nameof(ComputeLayoutPositions)} must return 1 position per child.");
                 });
             }
         }
-    }
-
-    [Flags]
-    public enum FlowDirections
-    {
-        Horizontal = 1 << 0,
-        Vertical = 1 << 1,
-
-        Both = Horizontal | Vertical,
     }
 }

@@ -25,11 +25,11 @@ namespace osu.Framework.Graphics.Shaders
 
         private int partID = -1;
 
-        private List<string> shaderCodes = new List<string>();
+        private readonly List<string> shaderCodes = new List<string>();
 
-        private Regex includeRegex = new Regex("^\\s*#\\s*include\\s+[\"<](.*)[\">]");
+        private readonly Regex includeRegex = new Regex("^\\s*#\\s*include\\s+[\"<](.*)[\">]");
 
-        private ShaderManager manager;
+        private readonly ShaderManager manager;
 
         internal ShaderPart(string name, byte[] data, ShaderType type, ShaderManager manager)
         {
@@ -39,7 +39,7 @@ namespace osu.Framework.Graphics.Shaders
             this.manager = manager;
 
             shaderCodes.Add(loadFile(data));
-            shaderCodes.RemoveAll(c => string.IsNullOrEmpty(c));
+            shaderCodes.RemoveAll(string.IsNullOrEmpty);
 
             if (shaderCodes.Count == 0)
                 return;
@@ -69,11 +69,11 @@ namespace osu.Framework.Graphics.Shaders
                     {
                         string includeName = includeMatch.Groups[1].Value.Trim();
 
-//#if DEBUG
-//                        byte[] rawData = null;
-//                        if (File.Exists(includeName))
-//                            rawData = File.ReadAllBytes(includeName);
-//#endif
+                        //#if DEBUG
+                        //                        byte[] rawData = null;
+                        //                        if (File.Exists(includeName))
+                        //                            rawData = File.ReadAllBytes(includeName);
+                        //#endif
                         shaderCodes.Add(loadFile(manager.LoadRaw(includeName)));
                     }
                     else
@@ -106,7 +106,7 @@ namespace osu.Framework.Graphics.Shaders
 #if DEBUG
             string compileLog = GL.GetShaderInfoLog(this);
             Log.AppendLine(string.Format('\t' + BOUNDARY, Name));
-            Log.AppendLine(string.Format("\tCompiled: {0}", Compiled));
+            Log.AppendLine($"\tCompiled: {Compiled}");
             if (!Compiled)
             {
                 Log.AppendLine("\tLog:");

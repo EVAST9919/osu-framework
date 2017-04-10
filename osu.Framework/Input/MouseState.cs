@@ -1,9 +1,10 @@
 // Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
-using System.Collections.Generic;
+using System;
 using OpenTK;
 using OpenTK.Input;
+using System.Linq;
 
 namespace osu.Framework.Input
 {
@@ -11,20 +12,9 @@ namespace osu.Framework.Input
     {
         public IMouseState LastState;
 
-        public List<ButtonState> ButtonStates = new List<ButtonState>(new[]
-        {
-            new ButtonState(MouseButton.Left),
-            new ButtonState(MouseButton.Middle),
-            new ButtonState(MouseButton.Right),
-            new ButtonState(MouseButton.Button1),
-            new ButtonState(MouseButton.Button2)
-        });
+        private const int mouse_button_count = (int)MouseButton.LastButton;
 
-        public bool LeftButton => ButtonStates.Find(b => b.Button == MouseButton.Left).State;
-        public bool RightButton => ButtonStates.Find(b => b.Button == MouseButton.Right).State;
-        public bool MiddleButton => ButtonStates.Find(b => b.Button == MouseButton.Middle).State;
-        public bool BackButton => ButtonStates.Find(b => b.Button == MouseButton.Button1).State;
-        public bool ForwardButton => ButtonStates.Find(b => b.Button == MouseButton.Button2).State;
+        public bool[] PressedButtons = new bool[mouse_button_count];
 
         public IMouseState NativeState => this;
 
@@ -32,7 +22,9 @@ namespace osu.Framework.Input
 
         public int Wheel { get; set; }
 
-        public bool HasMainButtonPressed => LeftButton || RightButton;
+        public bool HasMainButtonPressed => IsPressed(MouseButton.Left )|| IsPressed(MouseButton.Right);
+
+        public bool HasAnyButtonPressed => PressedButtons.Any(b => b);
 
         public Vector2 Delta => Position - (LastState?.Position ?? Vector2.Zero);
 
@@ -42,18 +34,6 @@ namespace osu.Framework.Input
 
         public Vector2? PositionMouseDown { get; internal set; }
 
-        public class ButtonState
-        {
-            public MouseButton Button;
-            public bool State;
-
-            public ButtonState(MouseButton button)
-            {
-                Button = button;
-                State = false;
-            }
-        }
-
         public void SetLast(IMouseState last)
         {
             (last as MouseState)?.SetLast(null);
@@ -62,5 +42,20 @@ namespace osu.Framework.Input
             if (last != null)
                 PositionMouseDown = last.PositionMouseDown;
         }
+
+        public IMouseState Clone()
+        {
+            var clone = (MouseState)MemberwiseClone();
+
+            clone.PressedButtons = new bool[mouse_button_count];
+            Array.Copy(PressedButtons, clone.PressedButtons, mouse_button_count);
+
+            clone.LastState = null;
+            return clone;
+        }
+
+        public bool IsPressed(MouseButton button) => PressedButtons[(int)button];
+
+        public void SetPressed(MouseButton button, bool pressed) => PressedButtons[(int)button] = pressed;
     }
 }

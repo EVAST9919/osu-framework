@@ -2,7 +2,6 @@
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -19,6 +18,7 @@ namespace osu.Framework.Graphics.Textures
     public class Texture : IDisposable
     {
         private static Texture whitePixel;
+
         public static Texture WhitePixel
         {
             get
@@ -51,7 +51,8 @@ namespace osu.Framework.Graphics.Textures
 
         public Texture(TextureGL textureGl)
         {
-            Debug.Assert(textureGl != null);
+            if (textureGl == null)
+                throw new ArgumentNullException(nameof(textureGl));
             TextureGL = textureGl;
         }
 
@@ -85,21 +86,13 @@ namespace osu.Framework.Graphics.Textures
 
         public int Width
         {
-            get
-            {
-                Debug.Assert(TextureGL != null);
-                return TextureGL.Width;
-            }
+            get { return TextureGL.Width; }
             set { TextureGL.Width = value; }
         }
 
         public int Height
         {
-            get
-            {
-                Debug.Assert(TextureGL != null);
-                return TextureGL.Height;
-            }
+            get { return TextureGL.Height; }
             set { TextureGL.Height = value; }
         }
 
@@ -155,14 +148,14 @@ namespace osu.Framework.Graphics.Textures
 
             byte[] data = upload.Data;
 
-            int bytesPerPixel = 4;
+            const int bytes_per_pixel = 4;
             byte* bDataPointer = (byte*)bData.Scan0;
 
             for (var y = 0; y < height; y++)
             {
                 // This is why real scan-width is important to have!
                 IntPtr row = new IntPtr(bDataPointer + y * bData.Stride);
-                Marshal.Copy(row, data, width * bytesPerPixel * y, width * bytesPerPixel);
+                Marshal.Copy(row, data, width * bytes_per_pixel * y, width * bytes_per_pixel);
             }
 
             bitmap.UnlockBits(bData);
@@ -218,7 +211,7 @@ namespace osu.Framework.Graphics.Textures
         {
         }
 
-        protected override RectangleF TextureBounds(RectangleF? textureRect = default(RectangleF?))
+        protected override RectangleF TextureBounds(RectangleF? textureRect = null)
         {
             // We need non-zero texture bounds for EdgeSmoothness to work correctly.
             // Let's be very conservative and use a tenth of the size of a pixel in the

@@ -13,13 +13,14 @@ namespace osu.Framework.Lists
 
         public event Action<T> LoadRequested;
 
-        public LifetimeList(IComparer<T> comparer) : base(comparer)
+        public LifetimeList(IComparer<T> comparer)
+            : base(comparer)
         {
             AliveItems = new SortedList<T>(comparer);
         }
 
         public SortedList<T> AliveItems { get; }
-        private List<bool> current = new List<bool>();
+        private readonly List<bool> current = new List<bool>();
 
         /// <summary>
         /// Updates the life status of this LifetimeList's children.
@@ -77,8 +78,7 @@ namespace osu.Framework.Lists
 
         public new int Add(T item)
         {
-            if (item.IsAlive && !item.IsLoaded)
-                LoadRequested?.Invoke(item);
+            LoadRequested?.Invoke(item);
 
             int i = base.Add(item);
             current.Insert(i, false);

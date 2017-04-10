@@ -26,14 +26,14 @@ namespace osu.Framework.Graphics.Batches
         private int currentVertex;
         private int lastVertex;
 
-        private int maxBuffers;
+        private readonly int maxBuffers;
 
         private VertexBuffer<T> currentVertexBuffer => VertexBuffers[currentIndex];
 
         protected VertexBatch(int bufferSize, int maxBuffers)
         {
             // Vertex buffers of size 0 don't make any sense. Let's not blindly hope for good behavior of OpenGL.
-            Debug.Assert(bufferSize > 0);
+            Trace.Assert(bufferSize > 0);
 
             Size = bufferSize;
             this.maxBuffers = maxBuffers;

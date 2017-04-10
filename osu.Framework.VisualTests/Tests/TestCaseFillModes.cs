@@ -4,28 +4,20 @@
 using OpenTK;
 using OpenTK.Graphics;
 using osu.Framework.Graphics;
-using osu.Framework.GameModes.Testing;
-using osu.Framework.Graphics.Primitives;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Testing;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseFillModes : TestCase
+    internal class TestCaseFillModes : TestCase
     {
-        public override string Name => @"Sprites - FillModes";
-
         public override string Description => @"Test sprite display and fill modes";
 
-        Texture sampleTexture;
+        private Texture sampleTexture;
 
         [BackgroundDependencyLoader]
         private void load(TextureStore store)
@@ -39,7 +31,7 @@ namespace osu.Framework.VisualTests.Tests
 
             Children = new Drawable[]
             {
-                new FlowContainer
+                new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.Both,
                     Children = new Drawable[]
@@ -180,11 +172,14 @@ namespace osu.Framework.VisualTests.Tests
             };
         }
 
-        class PaddedBox : Container
+        private class PaddedBox : Container
         {
-            private SpriteText t1, t2, t3, t4;
+            private readonly SpriteText t1;
+            private readonly SpriteText t2;
+            private readonly SpriteText t3;
+            private readonly SpriteText t4;
 
-            Container content;
+            private readonly Container content;
 
             protected override Container<Drawable> Content => content;
 
@@ -238,22 +233,15 @@ namespace osu.Framework.VisualTests.Tests
                 return base.Invalidate(invalidation, source, shallPropagate);
             }
 
-            public bool AllowDrag = true;
-
             protected override bool OnDrag(InputState state)
             {
-                if (!AllowDrag) return false;
-
                 Position += state.Mouse.Delta;
                 return true;
             }
 
-            protected override bool OnDragEnd(InputState state)
-            {
-                return true;
-            }
+            protected override bool OnDragEnd(InputState state) => true;
 
-            protected override bool OnDragStart(InputState state) => AllowDrag;
+            protected override bool OnDragStart(InputState state) => true;
         }
     }
 }

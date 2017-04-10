@@ -16,18 +16,35 @@ namespace osu.Framework.Audio
 
         public void AddItem(T item)
         {
-            if (Items.Contains(item)) return;
+            RegisterItem(item);
+            AddItemToList(item);
+        }
 
-            item.AddAdjustmentDependency(this);
-            Items.Add(item);
+        public void AddItemToList(T item)
+        {
+            PendingActions.Enqueue(delegate
+            {
+                if (Items.Contains(item)) return;
+                Items.Add(item);
+            });
+        }
+
+        public void RegisterItem(T item)
+        {
+            PendingActions.Enqueue(() => item.AddAdjustmentDependency(this));
+        }
+
+        internal override void OnStateChanged()
+        {
+            base.OnStateChanged();
+            foreach (var item in Items)
+                item.OnStateChanged();
         }
 
         public virtual void UpdateDevice(int deviceIndex)
         {
             foreach (var item in Items.OfType<IBassAudio>())
-            {
                 item.UpdateDevice(deviceIndex);
-            }
         }
 
         public override void Update()
@@ -38,14 +55,13 @@ namespace osu.Framework.Audio
             {
                 var item = Items[i];
 
-                item?.Update();
-
-                //todo: this is wrong (completed items may want to stay in an AudioCollectionManager ie. AudioTracks)
-                if ((item as IHasCompletedState)?.HasCompleted ?? false)
+                if (item.HasCompleted)
                 {
-                    item.Dispose();
                     Items.RemoveAt(i--);
+                    continue;
                 }
+
+                item.Update();
             }
         }
     }

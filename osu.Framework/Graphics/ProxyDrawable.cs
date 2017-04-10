@@ -7,12 +7,12 @@ namespace osu.Framework.Graphics
     {
         public ProxyDrawable(Drawable original)
         {
-            this.original = original;
+            Original = original;
         }
 
-        private Drawable original;
+        internal sealed override Drawable Original { get; }
 
-        internal override Drawable Original => original;
+        public override bool IsAlive => base.IsAlive && Original.IsAlive;
 
         // We do not want to receive updates. That is the business
         // of the original drawable.

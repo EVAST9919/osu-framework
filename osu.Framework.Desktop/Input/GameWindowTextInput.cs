@@ -9,11 +9,11 @@ namespace osu.Framework.Desktop.Input
 {
     public class GameWindowTextInput : ITextInputSource
     {
-        private BasicGameWindow window;
+        private readonly GameWindow window;
 
-        string pending = string.Empty;
+        private string pending = string.Empty;
 
-        public GameWindowTextInput(BasicGameWindow window)
+        public GameWindowTextInput(GameWindow window)
         {
             this.window = window;
         }

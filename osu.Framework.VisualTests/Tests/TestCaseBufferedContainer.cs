@@ -3,20 +3,13 @@
 
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
-using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.Transformations;
-using osu.Framework.Input;
 using OpenTK;
-using OpenTK.Graphics;
-using osu.Framework.GameModes.Testing;
 using System;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseBufferedContainer : TestCaseMasking
+    internal class TestCaseBufferedContainer : TestCaseMasking
     {
-        public override string Name => @"BufferedContainer";
         public override string Description => @"Buffered containers containing almost all visual effects.";
 
         public override void Reset()
@@ -26,7 +19,7 @@ namespace osu.Framework.VisualTests.Tests
             Remove(TestContainer);
 
             BufferedContainer buffer;
-            Add(buffer = new BufferedContainer()
+            Add(buffer = new BufferedContainer
             {
                 RelativeSizeAxes = Axes.Both,
                 Children = new[] { TestContainer }
@@ -40,5 +33,4 @@ namespace osu.Framework.VisualTests.Tests
             };
         }
     }
-
 }

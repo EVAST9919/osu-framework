@@ -3,20 +3,17 @@
 
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.Transformations;
-using osu.Framework.Input;
 using OpenTK;
 using OpenTK.Graphics;
-using osu.Framework.GameModes.Testing;
 using System;
+using osu.Framework.Testing;
+using osu.Framework.Input;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseMasking : TestCase
+    internal class TestCaseMasking : TestCase
     {
-        public override string Name => @"Masking";
         public override string Description => @"Various scenarios which potentially challenge masking calculations.";
 
         protected Container TestContainer;
@@ -30,7 +27,7 @@ namespace osu.Framework.VisualTests.Tests
                 RelativeSizeAxes = Axes.Both,
             });
 
-            string[] testNames = new[]
+            string[] testNames =
             {
                 @"Round corner masking",
                 @"Round corner AABB 1",
@@ -38,12 +35,13 @@ namespace osu.Framework.VisualTests.Tests
                 @"Round corner AABB 3",
                 @"Edge/border blurriness",
                 @"Nested masking",
+                @"Rounded corner input"
             };
 
             for (int i = 0; i < testNames.Length; i++)
             {
                 int test = i;
-                AddButton(testNames[i], delegate { loadTest(test); });
+                AddStep(testNames[i], delegate { loadTest(test); });
             }
 
             loadTest(0);
@@ -92,11 +90,7 @@ namespace osu.Framework.VisualTests.Tests
             switch (testType)
             {
                 default:
-                case 0:
                     {
-                        Color4 glowColour = Color4.Aquamarine;
-                        glowColour.A = 0.5f;
-
                         Container box;
                         TestContainer.Add(box = new InfofulBoxAutoSize
                         {
@@ -129,9 +123,6 @@ namespace osu.Framework.VisualTests.Tests
 
                 case 1:
                     {
-                        Color4 glowColour = Color4.Aquamarine;
-                        glowColour.A = 0.5f;
-
                         Container box;
                         TestContainer.Add(new InfofulBoxAutoSize
                         {
@@ -152,15 +143,16 @@ namespace osu.Framework.VisualTests.Tests
                             }
                         });
 
-                        box.OnUpdate += delegate { box.Rotation += 0.05f; box.CornerRadius = 100 + 100 * (float)Math.Sin(box.Rotation * 0.01); };
+                        box.OnUpdate += delegate
+                        {
+                            box.Rotation += 0.05f;
+                            box.CornerRadius = 100 + 100 * (float)Math.Sin(box.Rotation * 0.01);
+                        };
                         break;
                     }
 
                 case 2:
                     {
-                        Color4 glowColour = Color4.Aquamarine;
-                        glowColour.A = 0.5f;
-
                         Container box;
                         TestContainer.Add(new InfofulBoxAutoSize
                         {
@@ -278,7 +270,7 @@ namespace osu.Framework.VisualTests.Tests
                             };
                         };
 
-                        TestContainer.Add(new FlowContainer
+                        TestContainer.Add(new FillFlowContainer
                         {
                             RelativeSizeAxes = Axes.Both,
                             Children = new[]
@@ -288,28 +280,28 @@ namespace osu.Framework.VisualTests.Tests
                                     RelativeSizeAxes = Axes.Both,
                                     Size = new Vector2(0.5f),
                                     Masking = true,
-                                    Children = new Drawable[] { createMaskingBox(100) }
+                                    Children = new[] { createMaskingBox(100) }
                                 },
                                 new Container
                                 {
                                     RelativeSizeAxes = Axes.Both,
                                     Size = new Vector2(0.5f),
                                     Masking = true,
-                                    Children = new Drawable[] { createMaskingBox(10) }
+                                    Children = new[] { createMaskingBox(10) }
                                 },
                                 new Container
                                 {
                                     RelativeSizeAxes = Axes.Both,
                                     Size = new Vector2(0.5f),
                                     Masking = true,
-                                    Children = new Drawable[] { createMaskingBox(1) }
+                                    Children = new[] { createMaskingBox(1) }
                                 },
                                 new Container
                                 {
                                     RelativeSizeAxes = Axes.Both,
                                     Size = new Vector2(0.5f),
                                     Masking = true,
-                                    Children = new Drawable[] { createMaskingBox(0.1f) }
+                                    Children = new[] { createMaskingBox(0.1f) }
                                 },
                             }
                         });
@@ -349,6 +341,101 @@ namespace osu.Framework.VisualTests.Tests
                         });
                         break;
                     }
+
+                case 6:
+                    {
+                        TestContainer.Add(new FillFlowContainer
+                        {
+                            Direction = FillDirection.Vertical,
+                            AutoSizeAxes = Axes.Both,
+                            Spacing = new Vector2(0, 10),
+                            Children = new Drawable[]
+                            {
+                                new SpriteText
+                                {
+                                    Text = $"None of the folowing {nameof(CircularContainer)}s should trigger until the white part is hovered"
+                                },
+                                new FillFlowContainer
+                                {
+                                    Direction = FillDirection.Vertical,
+                                    AutoSizeAxes = Axes.Both,
+                                    Spacing = new Vector2(0, 2),
+                                    Children = new Drawable[]
+                                    {
+                                        new SpriteText
+                                        {
+                                            Text = "No masking"
+                                        },
+                                        new CircularContainerWithInput
+                                        {
+                                            Size = new Vector2(200),
+                                            Children = new Drawable[]
+                                            {
+                                                new Box
+                                                {
+                                                    RelativeSizeAxes = Axes.Both,
+                                                    Colour = Color4.Red
+                                                },
+                                                new CircularContainer
+                                                {
+                                                    RelativeSizeAxes = Axes.Both,
+                                                    Colour = Color4.White,
+                                                    Masking = true,
+                                                    Children = new[]
+                                                    {
+                                                        new Box
+                                                        {
+                                                            RelativeSizeAxes = Axes.Both
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                new FillFlowContainer
+                                {
+                                    Direction = FillDirection.Vertical,
+                                    AutoSizeAxes = Axes.Both,
+                                    Spacing = new Vector2(0, 2),
+                                    Children = new Drawable[]
+                                    {
+                                        new SpriteText
+                                        {
+                                            Text = "With masking"
+                                        },
+                                        new CircularContainerWithInput
+                                        {
+                                            Size = new Vector2(200),
+                                            Masking = true,
+                                            Children = new Drawable[]
+                                            {
+                                                new Box
+                                                {
+                                                    RelativeSizeAxes = Axes.Both,
+                                                    Colour = Color4.Red
+                                                },
+                                                new CircularContainer
+                                                {
+                                                    RelativeSizeAxes = Axes.Both,
+                                                    Colour = Color4.White,
+                                                    Masking = true,
+                                                    Children = new[]
+                                                    {
+                                                        new Box
+                                                        {
+                                                            RelativeSizeAxes = Axes.Both
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                        break;
+                    }
             }
 
 #if DEBUG
@@ -356,6 +443,19 @@ namespace osu.Framework.VisualTests.Tests
             //    testContainer.Children.FindAll(c => c.HasAutosizeChildren).ForEach(c => c.AutoSizeDebug = true);
 #endif
         }
-    }
 
+        private class CircularContainerWithInput : CircularContainer
+        {
+            protected override bool OnHover(InputState state)
+            {
+                ScaleTo(1.2f, 100);
+                return true;
+            }
+
+            protected override void OnHoverLost(InputState state)
+            {
+                ScaleTo(1f, 100);
+            }
+        }
+    }
 }

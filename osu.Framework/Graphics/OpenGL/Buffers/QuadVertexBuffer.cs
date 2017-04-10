@@ -6,7 +6,7 @@ using OpenTK.Graphics.ES30;
 
 namespace osu.Framework.Graphics.OpenGL.Buffers
 {
-    static class QuadIndexData
+    internal static class QuadIndexData
     {
         static QuadIndexData()
         {
@@ -51,8 +51,6 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
             if (forRendering)
                 GLWrapper.BindBuffer(BufferTarget.ElementArrayBuffer, QuadIndexData.EBO_ID);
         }
-
-        public override void Unbind() => base.Unbind();
 
         protected override int ToElements(int vertices) => 3 * vertices / 2;
 

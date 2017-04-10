@@ -16,21 +16,20 @@ namespace osu.Framework.Desktop.Platform
 {
     public class TcpIpcProvider : IDisposable
     {
-        private readonly int ipcPort = 45356;
+        private const int ipc_port = 45356;
+
         private TcpListener listener;
         private CancellationTokenSource cancelListener;
-        private CancellationToken token;
 
         public event Action<IpcMessage> MessageReceived;
-    
+
         public bool Bind()
         {
-            listener = new TcpListener(IPAddress.Loopback, ipcPort);
+            listener = new TcpListener(IPAddress.Loopback, ipc_port);
             try
             {
                 listener.Start();
                 cancelListener = new CancellationTokenSource();
-                token = cancelListener.Token;
                 return true;
             }
             catch (SocketException ex)
@@ -38,57 +37,62 @@ namespace osu.Framework.Desktop.Platform
                 listener = null;
                 if (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
                     return false;
-                else
-                {
-                    Console.WriteLine($@"Unhandled exception initializing IPC server: {ex}");
-                    return false;
-                }
+
+                Console.WriteLine($@"Unhandled exception initializing IPC server: {ex}");
+                return false;
             }
         }
 
-        public async Task Start()
+        public async Task StartAsync()
         {
-            while (true)
+            var token = cancelListener.Token;
+            try
             {
-                while (!listener.Pending())
+                while (true)
                 {
-                    await Task.Delay(10);
-                    if (token.IsCancellationRequested)
+                    while (!listener.Pending())
                     {
-                        listener.Stop();
-                        return;
-                    }
-                }
-                using (var client = await listener.AcceptTcpClientAsync())
-                {
-                    using (var stream = client.GetStream())
-                    {
-                        byte[] header = new byte[sizeof(int)];
-                        await stream.ReadAsync(header, 0, sizeof(int));
-                        int len = BitConverter.ToInt32(header, 0);
-                        byte[] data = new byte[len];
-                        await stream.ReadAsync(data, 0, len);
-                        var str = Encoding.UTF8.GetString(data);
-                        var json = JToken.Parse(str);
-                        var type = Type.GetType(json["Type"].Value<string>());
-                        Debug.Assert(type != null);
-                        var msg = new IpcMessage
+                        await Task.Delay(10, token);
+                        if (token.IsCancellationRequested)
                         {
-                            Type = type.AssemblyQualifiedName,
-                            Value = JsonConvert.DeserializeObject(
-                                json["Value"].ToString(), type),
-                        };
-                        MessageReceived?.Invoke(msg);
+                            listener.Stop();
+                            return;
+                        }
+                    }
+                    using (var client = await listener.AcceptTcpClientAsync())
+                    {
+                        using (var stream = client.GetStream())
+                        {
+                            byte[] header = new byte[sizeof(int)];
+                            await stream.ReadAsync(header, 0, sizeof(int), token);
+                            int len = BitConverter.ToInt32(header, 0);
+                            byte[] data = new byte[len];
+                            await stream.ReadAsync(data, 0, len, token);
+                            var str = Encoding.UTF8.GetString(data);
+                            var json = JToken.Parse(str);
+                            var type = Type.GetType(json["Type"].Value<string>());
+                            Trace.Assert(type != null);
+                            var msg = new IpcMessage
+                            {
+                                Type = type.AssemblyQualifiedName,
+                                Value = JsonConvert.DeserializeObject(
+                                    json["Value"].ToString(), type),
+                            };
+                            MessageReceived?.Invoke(msg);
+                        }
                     }
                 }
             }
+            catch (TaskCanceledException)
+            {
+            }
         }
 
-        public async Task SendMessage(IpcMessage message)
+        public async Task SendMessageAsync(IpcMessage message)
         {
             using (var client = new TcpClient())
             {
-                await client.ConnectAsync(IPAddress.Loopback, ipcPort);
+                await client.ConnectAsync(IPAddress.Loopback, ipc_port);
                 using (var stream = client.GetStream())
                 {
                     var str = JsonConvert.SerializeObject(message, Formatting.None);
@@ -108,4 +112,3 @@ namespace osu.Framework.Desktop.Platform
         }
     }
 }
-

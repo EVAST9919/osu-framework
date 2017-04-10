@@ -6,36 +6,55 @@ using System.Linq;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input;
-using osu.Framework.Threading;
 using OpenTK;
 using OpenTK.Graphics;
+using osu.Framework.Extensions.Color4Extensions;
+using System.Collections.Generic;
 
 namespace osu.Framework.Graphics.Visualisation
 {
     internal class VisualisedDrawable : Container
     {
-        public Drawable Target { get; private set; }
+        public class NestingDepthComparer : IComparer<VisualisedDrawable>
+        {
+            public int Compare(VisualisedDrawable x, VisualisedDrawable y)
+            {
+                if (x == null) throw new NullReferenceException($@"{nameof(x)} cannot be null");
+                if (y == null) throw new NullReferenceException($@"{nameof(y)} cannot be null");
 
-        private SpriteText text;
-        private Drawable previewBox;
-        private Drawable activityInvalidate;
-        private Drawable activityAutosize;
-        private Drawable activityLayout;
+                return x.nestingDepth.CompareTo(y.nestingDepth);
+            }
+        }
+
+        public static IComparer<VisualisedDrawable> Comparer => new NestingDepthComparer();
+
+        public Drawable Target { get; }
+
+        private readonly Box textBg;
+        private readonly SpriteText text;
+        private readonly Drawable previewBox;
+        private readonly Drawable activityInvalidate;
+        private readonly Drawable activityAutosize;
+        private readonly Drawable activityLayout;
 
         public Action HoverGained;
         public Action HoverLost;
 
         public Action RequestTarget;
 
-        const int line_height = 12;
+        private const int line_height = 12;
 
-        public FlowContainer Flow;
+        public FillFlowContainer<VisualisedDrawable> Flow;
 
-        private TreeContainer tree;
+        private readonly TreeContainer tree;
 
-        public VisualisedDrawable(Drawable d, TreeContainer tree)
+        private readonly int nestingDepth;
+
+        public VisualisedDrawable(VisualisedDrawable parent, Drawable d, TreeContainer tree)
         {
             this.tree = tree;
+
+            nestingDepth = (parent?.nestingDepth ?? 0) + 1;
             Target = d;
 
             attachEvents();
@@ -43,7 +62,7 @@ namespace osu.Framework.Graphics.Visualisation
             var sprite = Target as Sprite;
 
             AutoSizeAxes = Axes.Both;
-            Add(new Drawable[]
+            Add(new[]
             {
                 activityInvalidate = new Box
                 {
@@ -66,19 +85,36 @@ namespace osu.Framework.Graphics.Visualisation
                     Position = new Vector2(0, 0),
                     Alpha = 0
                 },
-                previewBox = sprite?.Texture == null ? previewBox = new Box { Colour = Color4.White } : new Sprite
+                previewBox = sprite?.Texture == null
+                    ? previewBox = new Box { Colour = Color4.White }
+                    : new Sprite
+                    {
+                        Texture = sprite.Texture,
+                        Scale = new Vector2(sprite.Texture.DisplayWidth / sprite.Texture.DisplayHeight, 1),
+                    },
+                new Container
                 {
-                    Texture = sprite.Texture,
-                    Scale = new Vector2(sprite.Texture.DisplayWidth / sprite.Texture.DisplayHeight, 1),
-                },
-                text = new SpriteText
-                {
+                    AutoSizeAxes = Axes.Both,
                     Position = new Vector2(24, -3),
-                    Scale = new Vector2(0.9f),
+                    Children = new Drawable[]
+                    {
+                        textBg = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Size = new Vector2(1, 0.8f),
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Colour = Color4.Transparent,
+                        },
+                        text = new SpriteText
+                        {
+                            Scale = new Vector2(0.9f),
+                        },
+                    }
                 },
-                Flow = new FlowContainer
+                Flow = new FillFlowContainer<VisualisedDrawable>
                 {
-                    Direction = FlowDirections.Vertical,
+                    Direction = FillDirection.Vertical,
                     AutoSizeAxes = Axes.Both,
                     Position = new Vector2(10, 14)
                 },
@@ -123,12 +159,14 @@ namespace osu.Framework.Graphics.Visualisation
         protected override bool OnHover(InputState state)
         {
             HoverGained?.Invoke();
+            textBg.Colour = Color4.PaleVioletRed.Opacity(0.7f);
             return base.OnHover(state);
         }
 
         protected override void OnHoverLost(InputState state)
         {
             HoverLost?.Invoke();
+            textBg.Colour = Color4.Transparent;
             base.OnHoverLost(state);
         }
 
@@ -155,7 +193,7 @@ namespace osu.Framework.Graphics.Visualisation
             Scheduler.Add(() => activityLayout.FadeOutFromOne(1));
         }
 
-        private void onInvalidate()
+        private void onInvalidate(Drawable d)
         {
             Scheduler.Add(() => activityInvalidate.FadeOutFromOne(1));
         }

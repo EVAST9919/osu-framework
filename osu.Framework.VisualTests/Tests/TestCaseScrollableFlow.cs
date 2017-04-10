@@ -3,40 +3,38 @@
 
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Transformations;
 using osu.Framework.MathUtils;
 using osu.Framework.Threading;
 using OpenTK;
 using OpenTK.Graphics;
-using osu.Framework.GameModes.Testing;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Testing;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseScrollableFlow : TestCase
+    internal class TestCaseScrollableFlow : TestCase
     {
         private ScheduledDelegate boxCreator;
 
-        public override string Name => @"Scrollable Flow";
         public override string Description => @"A flow container in a scroll container";
-        
-        ScrollContainer scroll;
-        FlowContainer flow;
-        Direction scrollDir;
 
-        private void createArea(Direction scrollDir)
+        private ScrollContainer scroll;
+        private FillFlowContainer flow;
+        private Direction scrollDir;
+
+        private void createArea(Direction dir)
         {
-            Axes scrollAxis = scrollDir == Direction.Horizontal ? Axes.X : Axes.Y;
+            Axes scrollAxis = dir == Direction.Horizontal ? Axes.X : Axes.Y;
 
             Children = new[]
             {
-                scroll = new ScrollContainer(scrollDir)
+                scroll = new ScrollContainer(dir)
                 {
-                    Padding = new MarginPadding { Left = 150 },
-                    Children = new []
+                    RelativeSizeAxes = Axes.Both,
+                    Children = new[]
                     {
-                        flow = new FlowContainer
+                        flow = new FillFlowContainer
                         {
                             LayoutDuration = 100,
                             LayoutEasing = EasingTypes.Out,
@@ -50,20 +48,57 @@ namespace osu.Framework.VisualTests.Tests
             };
         }
 
+        private void createAreaBoth()
+        {
+            Children = new[]
+            {
+                new ScrollContainer(Direction.Horizontal)
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Padding = new MarginPadding { Left = 150 },
+                    Children = new[]
+                    {
+                        scroll = new ScrollContainer
+                        {
+                            RelativeSizeAxes = Axes.Y,
+                            AutoSizeAxes = Axes.X,
+                            Children = new[]
+                            {
+                                flow = new FillFlowContainer
+                                {
+                                    LayoutDuration = 100,
+                                    LayoutEasing = EasingTypes.Out,
+                                    Spacing = new Vector2(1, 1),
+                                    Size = new Vector2(1000, 0),
+                                    AutoSizeAxes = Axes.Y,
+                                    Padding = new MarginPadding(5)
+                                }
+                            }
+                        }
+                    },
+                },
+            };
+
+            scroll.ScrollContent.AutoSizeAxes = Axes.None;
+            scroll.ScrollContent.RelativeSizeAxes = Axes.None;
+            scroll.ScrollContent.AutoSizeAxes = Axes.Both;
+        }
+
         public override void Reset()
         {
             base.Reset();
 
             createArea(scrollDir = Direction.Vertical);
 
-            AddButton("Vertical", delegate { createArea(scrollDir = Direction.Vertical); });
-            AddButton("Horizontal", delegate { createArea(scrollDir = Direction.Horizontal); });
+            AddStep("Vertical", delegate { createArea(scrollDir = Direction.Vertical); });
+            AddStep("Horizontal", delegate { createArea(scrollDir = Direction.Horizontal); });
+            AddStep("Both", createAreaBoth);
 
-            AddButton("Dragger Anchor 1", delegate { scroll.ScrollDraggerAnchor = scrollDir == Direction.Vertical ? Anchor.TopRight : Anchor.BottomLeft; });
-            AddButton("Dragger Anchor 2", delegate { scroll.ScrollDraggerAnchor = scrollDir == Direction.Vertical ? Anchor.TopLeft : Anchor.TopLeft; });
+            AddStep("Dragger Anchor 1", delegate { scroll.ScrollDraggerAnchor = scrollDir == Direction.Vertical ? Anchor.TopRight : Anchor.BottomLeft; });
+            AddStep("Dragger Anchor 2", delegate { scroll.ScrollDraggerAnchor = Anchor.TopLeft; });
 
-            AddButton("Dragger Visible", delegate { scroll.ScrollDraggerVisible = !scroll.ScrollDraggerVisible; });
-            AddButton("Dragger Overlap", delegate { scroll.ScrollDraggerOverlapsContent = !scroll.ScrollDraggerOverlapsContent; });
+            AddStep("Dragger Visible", delegate { scroll.ScrollDraggerVisible = !scroll.ScrollDraggerVisible; });
+            AddStep("Dragger Overlap", delegate { scroll.ScrollDraggerOverlapsContent = !scroll.ScrollDraggerOverlapsContent; });
 
             boxCreator?.Cancel();
             boxCreator = Scheduler.AddDelayed(delegate
@@ -74,7 +109,8 @@ namespace osu.Framework.VisualTests.Tests
                 Container container = new Container
                 {
                     Size = new Vector2(80, 80),
-                    Children = new[] {
+                    Children = new[]
+                    {
                         box = new Box
                         {
                             RelativeSizeAxes = Axes.Both,

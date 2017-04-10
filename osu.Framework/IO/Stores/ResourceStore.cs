@@ -4,16 +4,17 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace osu.Framework.IO.Stores
 {
     public class ResourceStore<T> : IResourceStore<T>
     {
-        private Dictionary<string, Action> actionList = new Dictionary<string, Action>();
+        private readonly Dictionary<string, Action> actionList = new Dictionary<string, Action>();
 
-        private List<IResourceStore<T>> stores = new List<IResourceStore<T>>();
+        private readonly List<IResourceStore<T>> stores = new List<IResourceStore<T>>();
 
-        private List<string> searchExtensions = new List<string>();
+        private readonly List<string> searchExtensions = new List<string>();
 
         /// <summary>
         /// Initializes a resource store with no stores.
@@ -38,8 +39,8 @@ namespace osu.Framework.IO.Stores
         /// <param name="stores">The collection of stores.</param>
         public ResourceStore(IResourceStore<T>[] stores)
         {
-            foreach (ResourceStore<T> store in stores)
-                AddStore(store);
+            foreach (var resourceStore in stores.Cast<ResourceStore<T>>())
+                AddStore(resourceStore);
         }
 
         /// <summary>

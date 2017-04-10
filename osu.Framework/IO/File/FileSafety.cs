@@ -260,10 +260,7 @@ namespace osu.Framework.IO.File
             Directory.Delete(oldDirectory, true);
         }
 
-        public static string GetExtension(string filename)
-        {
-            return Path.GetExtension(filename).Trim('.').ToLower();
-        }
+        public static string GetExtension(string filename) => Path.GetExtension(filename)?.Trim('.').ToLower();
 
         //        public static FileType GetFileType(string filename)
         //        {
@@ -328,7 +325,6 @@ namespace osu.Framework.IO.File
         public static int GetMaxPathLength(string directory)
         {
             int highestPathLength = directory.Length;
-            int tempPathLength;
 
             foreach (string file in Directory.GetFiles(directory))
             {
@@ -338,7 +334,7 @@ namespace osu.Framework.IO.File
 
             foreach (string dir in Directory.GetDirectories(directory))
             {
-                tempPathLength = GetMaxPathLength(dir);
+                int tempPathLength = GetMaxPathLength(dir);
                 if (tempPathLength > highestPathLength)
                     highestPathLength = tempPathLength;
             }
@@ -362,11 +358,11 @@ namespace osu.Framework.IO.File
             fixed (char* stringPtr = converted)
             {
                 byte* stringBytes = (byte*)stringPtr;
-                byte* stringEnd = (byte*)(stringPtr) + converted.Length * 2;
+                byte* stringEnd = (byte*)stringPtr + converted.Length * 2;
                 byte* bytePtr2 = bytePtr;
                 do
                 {
-                    *stringBytes = *(bytePtr2++);
+                    *stringBytes = *bytePtr2++;
                     stringBytes++;
                 } while (stringBytes != stringEnd);
             }
@@ -377,23 +373,25 @@ namespace osu.Framework.IO.File
         {
             SecurityIdentifier sid = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
             NTAccount acct = sid.Translate(typeof(NTAccount)) as NTAccount;
-            Debug.Assert(acct != null);
-            string strEveryoneAccount = acct.ToString();
-
-            try
+            if (acct != null)
             {
-                AddDirectorySecurity(directory, strEveryoneAccount, FileSystemRights.FullControl,
-                    InheritanceFlags.None, PropagationFlags.NoPropagateInherit,
-                    AccessControlType.Allow);
-                AddDirectorySecurity(directory, strEveryoneAccount, FileSystemRights.FullControl,
-                    InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit,
-                    PropagationFlags.InheritOnly, AccessControlType.Allow);
+                string strEveryoneAccount = acct.ToString();
 
-                RemoveReadOnlyRecursive(directory);
-            }
-            catch
-            {
-                return false;
+                try
+                {
+                    AddDirectorySecurity(directory, strEveryoneAccount, FileSystemRights.FullControl,
+                        InheritanceFlags.None, PropagationFlags.NoPropagateInherit,
+                        AccessControlType.Allow);
+                    AddDirectorySecurity(directory, strEveryoneAccount, FileSystemRights.FullControl,
+                        InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit,
+                        PropagationFlags.InheritOnly, AccessControlType.Allow);
+
+                    RemoveReadOnlyRecursive(directory);
+                }
+                catch
+                {
+                    return false;
+                }
             }
 
             return true;

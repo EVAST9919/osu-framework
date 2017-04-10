@@ -2,7 +2,6 @@
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
-using System.Diagnostics;
 using System.Reflection;
 using OpenTK.Graphics.ES30;
 using osu.Framework.Statistics;
@@ -13,13 +12,13 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
     {
         public T[] Vertices;
 
-        private int vboId;
-        private BufferUsageHint usage;
+        private readonly int vboId;
+        private readonly BufferUsageHint usage;
 
         /// <summary>
         /// The stride of the vertex type T. We use reflection since we don't want to abuse a dummy T instance combined with virtual dispatch.
         /// </summary>
-        private static readonly int stride = (int)typeof(T).GetField("Stride", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+        private static readonly int stride = (int)(typeof(T).GetField("Stride", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) ?? 0);
 
         /// <summary>
         /// The static Bind method of vertex type T, used to bind the correct vertex attribute locations for use in shaders.
@@ -32,7 +31,7 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
                 typeof(T).GetMethod("Bind", BindingFlags.Public | BindingFlags.Static)
             );
 
-        public VertexBuffer(int amountVertices, BufferUsageHint usage)
+        protected VertexBuffer(int amountVertices, BufferUsageHint usage)
         {
             this.usage = usage;
             GL.GenBuffers(1, out vboId);
@@ -67,7 +66,8 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
 
         private void resize(int amountVertices)
         {
-            Debug.Assert(!IsDisposed);
+            if (IsDisposed)
+                throw new ObjectDisposedException(ToString(), "Can not resize disposed vertex buffers.");
 
             T[] oldVertices = Vertices;
             Vertices = new T[amountVertices];
@@ -79,12 +79,13 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
             if (GLWrapper.BindBuffer(BufferTarget.ArrayBuffer, vboId))
                 bind_attributes();
 
-            GL.BufferData(BufferTarget.ArrayBuffer, (IntPtr)(Vertices.Length * stride), IntPtr.Zero, usage);
+            GL.BufferData(BufferTarget.ArrayBuffer, (IntPtr)(Vertices.Length * Stride), IntPtr.Zero, usage);
         }
 
         public virtual void Bind(bool forRendering)
         {
-            Debug.Assert(!IsDisposed);
+            if (IsDisposed)
+                throw new ObjectDisposedException(ToString(), "Can not bind disposed vertex buffers.");
 
             if (GLWrapper.BindBuffer(BufferTarget.ArrayBuffer, vboId))
                 bind_attributes();
@@ -105,6 +106,10 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
         }
 
         protected abstract PrimitiveType Type { get; }
+
+        public static int Stride => stride;
+
+        public static int Stride1 => stride;
 
         public void Draw()
         {
@@ -131,7 +136,7 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
             Bind(false);
 
             int amountVertices = endIndex - startIndex;
-            GL.BufferSubData(BufferTarget.ArrayBuffer, (IntPtr)(startIndex * stride), (IntPtr)(amountVertices * stride), ref Vertices[startIndex]);
+            GL.BufferSubData(BufferTarget.ArrayBuffer, (IntPtr)(startIndex * Stride), (IntPtr)(amountVertices * Stride), ref Vertices[startIndex]);
 
             Unbind();
 

@@ -14,22 +14,28 @@ using osu.Framework.IO.Stores;
 
 namespace osu.Framework.Graphics.Sprites
 {
-    public class SpriteText : FlowContainer
+    public class SpriteText : FillFlowContainer
     {
+        private static readonly char[] default_fixed_width_exceptions = { '.', ':', ',' };
+
         /// <summary>
-        /// The amount by which characters should overlap each other (negative character spacing).
+        /// An array of characters which should not get a fixed width in a <see cref="FixedWidth"/> instance.
         /// </summary>
-        public float SpacingOverlap
-        {
-            get { return Spacing.X; }
-            set
-            {
-                Spacing = new Vector2(value, 0);
-                internalSize.Invalidate();
-            }
-        }
+        protected virtual char[] FixedWidthExceptionCharacters => default_fixed_width_exceptions;
+
+        /// <summary>
+        /// Decide whether we want to make our SpriteText's vertical size to be <see cref="TextSize"/> (the full height) or precisely the size of used characters.
+        /// Set to false to allow better centering of individual characters/numerals/etc.
+        /// </summary>
+        public bool UseFullGlyphHeight = true;
 
         public override bool IsPresent => base.IsPresent && !string.IsNullOrEmpty(text);
+
+        public bool AllowMultiline
+        {
+            get { return Direction == FillDirection.Full; }
+            set { Direction = value ? FillDirection.Full : FillDirection.Horizontal; }
+        }
 
         private string font;
 
@@ -44,6 +50,7 @@ namespace osu.Framework.Graphics.Sprites
         }
 
         private bool shadow;
+
         public bool Shadow
         {
             get { return shadow; }
@@ -58,6 +65,7 @@ namespace osu.Framework.Graphics.Sprites
 
 
         private Color4 shadowColour = new Color4(0f, 0f, 0f, 0.2f);
+
         public Color4 ShadowColour
         {
             get { return shadowColour; }
@@ -77,22 +85,18 @@ namespace osu.Framework.Graphics.Sprites
 
         public override bool HandleInput => false;
 
-        public SpriteText(TextureStore store = null)
+        public SpriteText()
         {
-            this.store = store;
             AutoSizeAxes = Axes.Both;
         }
 
-        const float default_text_size = 20;
+        private const float default_text_size = 20;
 
         private float textSize = default_text_size;
 
         public float TextSize
         {
-            get
-            {
-                return textSize;
-            }
+            get { return textSize; }
             set
             {
                 if (textSize == value) return;
@@ -105,10 +109,9 @@ namespace osu.Framework.Graphics.Sprites
         }
 
         [BackgroundDependencyLoader]
-        private void load(FontStore fonts)
+        private void load(FontStore store)
         {
-            if (store == null)
-                store = fonts;
+            this.store = store;
 
             spaceWidth = CreateCharacterDrawable('.')?.DrawWidth * 2 ?? default_text_size;
 
@@ -120,7 +123,7 @@ namespace osu.Framework.Graphics.Sprites
             }
         }
 
-        private string text;
+        private string text = string.Empty;
 
         public string Text
         {
@@ -130,7 +133,7 @@ namespace osu.Framework.Graphics.Sprites
                 if (text == value)
                     return;
 
-                text = value;
+                text = value ?? string.Empty;
                 internalSize.Invalidate();
             }
         }
@@ -144,7 +147,16 @@ namespace osu.Framework.Graphics.Sprites
             refreshLayout();
         }
 
-        string lastText;
+        public override bool Invalidate(Invalidation invalidation = Invalidation.All, Drawable source = null, bool shallPropagate = true)
+        {
+            if ((invalidation & Invalidation.Colour) > 0 && Shadow)
+                internalSize.Invalidate(); //we may need to recompute the shadow alpha if our text colour has changed (see shadowAlpha).
+
+            return base.Invalidate(invalidation, source, shallPropagate);
+        }
+
+        private string lastText;
+        private float lastShadowAlpha;
 
         private void refreshLayout()
         {
@@ -157,11 +169,30 @@ namespace osu.Framework.Graphics.Sprites
 
                 //keep sprites which haven't changed since last layout.
                 List<Drawable> keepDrawables = new List<Drawable>();
-                int length = Math.Min(lastText?.Length ?? 0, text?.Length ?? 0);
 
-                keepDrawables.AddRange(Children.TakeWhile((n, i) => i < length && lastText[i] == text[i]));
-                Remove(keepDrawables);
+                bool allowKeepingExistingDrawables = true;
+
+                //adjust shadow alpha based on highest component intensity to avoid muddy display of darker text.
+                //squared result for quadratic fall-off seems to give the best result.
+                var avgColour = (Color4)DrawInfo.Colour.AverageColour;
+                float shadowAlpha = (float)Math.Pow(Math.Max(Math.Max(avgColour.R, avgColour.G), avgColour.B), 2);
+
+                //we can't keep existing drawabled if our shadow has changed, as the shadow is applied in the add-loop.
+                //this could potentially be optimised if necessary.
+                allowKeepingExistingDrawables &= shadowAlpha == lastShadowAlpha;
+
+                lastShadowAlpha = shadowAlpha;
+
+                if (allowKeepingExistingDrawables)
+                {
+                    int length = Math.Min(lastText?.Length ?? 0, text.Length);
+                    keepDrawables.AddRange(Children.TakeWhile((n, i) => i < length && lastText[i] == text[i]));
+                    Remove(keepDrawables); //doesn't dispose
+                }
+
                 Clear();
+
+                if (text.Length == 0) return Vector2.Zero;
 
                 foreach (var k in keepDrawables)
                     Add(k);
@@ -170,11 +201,13 @@ namespace osu.Framework.Graphics.Sprites
                 {
                     char c = text[index];
 
+                    bool fixedWidth = FixedWidth && !FixedWidthExceptionCharacters.Contains(c);
+
                     Drawable d;
 
                     if (char.IsWhiteSpace(c))
                     {
-                        float width = FixedWidth ? constantWidth.GetValueOrDefault() : spaceWidth;
+                        float width = fixedWidth ? constantWidth.GetValueOrDefault() : spaceWidth;
 
                         switch ((int)c)
                         {
@@ -194,7 +227,7 @@ namespace osu.Framework.Graphics.Sprites
                     {
                         d = CreateCharacterDrawable(c);
 
-                        if (FixedWidth)
+                        if (fixedWidth)
                         {
                             d.Anchor = Anchor.TopCentre;
                             d.Origin = Anchor.TopCentre;
@@ -202,15 +235,18 @@ namespace osu.Framework.Graphics.Sprites
 
                         var ctn = new Container
                         {
-                            Size = new Vector2(FixedWidth ? constantWidth.GetValueOrDefault() : d.DrawSize.X, 1f),
+                            Size = new Vector2(fixedWidth ? constantWidth.GetValueOrDefault() : d.DrawSize.X, UseFullGlyphHeight ? 1 : d.DrawSize.Y),
                             Scale = new Vector2(TextSize),
                             Children = new[] { d }
                         };
 
-                        if (shadow)
+                        if (shadow && shadowAlpha > 0)
                         {
                             Drawable shadowDrawable = CreateCharacterDrawable(c);
                             shadowDrawable.Position = new Vector2(0, 0.06f);
+                            shadowDrawable.Anchor = d.Anchor;
+                            shadowDrawable.Origin = d.Origin;
+                            shadowDrawable.Alpha = shadowAlpha;
                             shadowDrawable.Colour = shadowColour;
                             shadowDrawable.Depth = float.MaxValue;
                             ctn.Add(shadowDrawable);

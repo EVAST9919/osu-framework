@@ -1,20 +1,18 @@
 ﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics;
 using osu.Framework.Input;
+using osu.Framework.Testing;
 using OpenTK;
 using OpenTK.Graphics;
-using osu.Framework.GameModes.Testing;
-using Triangle = osu.Framework.Graphics.Sprites.Triangle;
 
 namespace osu.Framework.VisualTests.Tests
 {
-    class TestCaseTriangles : TestCase
+    internal class TestCaseTriangles : TestCase
     {
-        public override string Name => @"Triangles";
         public override string Description => @"Various scenarios which potentially challenge triangles.";
 
         private Container testContainer;
@@ -28,15 +26,12 @@ namespace osu.Framework.VisualTests.Tests
                 RelativeSizeAxes = Axes.Both,
             });
 
-            string[] testNames = new[]
-            {
-                @"Bounding box / input",
-            };
+            string[] testNames = { @"Bounding box / input" };
 
             for (int i = 0; i < testNames.Length; i++)
             {
                 int test = i;
-                AddButton(testNames[i], delegate { loadTest(test); });
+                AddStep(testNames[i], delegate { loadTest(test); });
             }
 
             loadTest(0);
@@ -82,12 +77,13 @@ namespace osu.Framework.VisualTests.Tests
         {
             testContainer.Clear();
 
-            Container box;
             Triangle triangle;
 
             switch (testType)
             {
                 case 0:
+                    Container box;
+
                     testContainer.Add(box = new InfofulBoxAutoSize
                     {
                         Anchor = Anchor.Centre,
@@ -175,7 +171,7 @@ namespace osu.Framework.VisualTests.Tests
         }
     }
 
-    class DraggableTriangle : Triangle
+    internal class DraggableTriangle : Triangle
     {
         public bool AllowDrag = true;
         public override bool HandleInput => true;

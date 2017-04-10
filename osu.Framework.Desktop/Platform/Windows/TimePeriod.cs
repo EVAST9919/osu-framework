@@ -27,7 +27,7 @@ namespace osu.Framework.Desktop.Platform.Windows
         internal static int MinimumPeriod => timeCapabilities.wPeriodMin;
         internal static int MaximumPeriod => timeCapabilities.wPeriodMax;
 
-        bool canAdjust = MaximumPeriod > 0;
+        private bool canAdjust = MaximumPeriod > 0;
 
         static TimePeriod()
         {
@@ -39,7 +39,7 @@ namespace osu.Framework.Desktop.Platform.Windows
             this.period = period;
         }
 
-        bool active;
+        private bool active;
 
         internal bool Active
         {
@@ -95,8 +95,8 @@ namespace osu.Framework.Desktop.Platform.Windows
         [StructLayout(LayoutKind.Sequential)]
         private struct TimeCaps
         {
-            internal int wPeriodMin;
-            internal int wPeriodMax;
+            internal readonly int wPeriodMin;
+            internal readonly int wPeriodMax;
         }
     }
 }

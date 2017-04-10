@@ -7,7 +7,7 @@ namespace osu.Framework.Threading
 {
     public class AtomicCounter
     {
-        private long count = 0;
+        private long count;
 
         public long Increment()
         {
@@ -26,15 +26,9 @@ namespace osu.Framework.Threading
 
         public long Value
         {
-            set
-            {
-                Interlocked.Exchange(ref count, value);
-            }
+            set { Interlocked.Exchange(ref count, value); }
 
-            get
-            {
-                return Interlocked.Read(ref count);
-            }
+            get { return Interlocked.Read(ref count); }
         }
     }
 }

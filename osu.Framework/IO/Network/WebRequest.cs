@@ -125,9 +125,9 @@ namespace osu.Framework.IO.Network
         /// </summary>
         public int Timeout = DEFAULT_TIMEOUT;
 
-        static Logger logger;
+        private static readonly Logger logger;
 
-        static SmartThreadPool threadPool;
+        private static readonly SmartThreadPool thread_pool;
         private IWorkItemResult workItem;
 
         /// <summary>
@@ -137,7 +137,7 @@ namespace osu.Framework.IO.Network
 
         static WebRequest()
         {
-            threadPool = new SmartThreadPool(new STPStartInfo
+            thread_pool = new SmartThreadPool(new STPStartInfo
             {
                 MaxWorkerThreads = 64,
                 AreThreadsBackground = true,
@@ -169,15 +169,15 @@ namespace osu.Framework.IO.Network
 
         private Stream internalResponseStream;
 
-        private static AddressFamily? preferredNetwork = AddressFamily.InterNetwork;
+        private static readonly AddressFamily? preferred_network = AddressFamily.InterNetwork;
 
         /// <summary>
         /// Does a manual DNS lookup and forcefully uses IPv4 by shoving IP addresses where the host normally is.
         /// Unreliable for HTTPS+Cloudflare? Only use when necessary.
         /// </summary>
-        public static bool UseExplicitIPv4Requests = false;
+        public static bool UseExplicitIPv4Requests;
 
-        static bool? useFallbackPath;
+        private static bool? useFallbackPath;
         private bool didGetIPv6IP;
 
         protected virtual HttpWebRequest CreateWebRequest(string requestString = null)
@@ -201,7 +201,7 @@ namespace osu.Framework.IO.Network
 
                 foreach (var ip in addresses)
                 {
-                    bool preferred = ip.AddressFamily == preferredNetwork;
+                    bool preferred = ip.AddressFamily == preferred_network;
 
                     if (!preferred && address != null)
                         continue;
@@ -224,7 +224,8 @@ namespace osu.Framework.IO.Network
                 req = System.Net.WebRequest.Create(requestUrl.Replace(baseHost, $"{address}:443")) as HttpWebRequest;
             }
 
-            Debug.Assert(req != null);
+            if (req == null)
+                throw new InvalidOperationException(@"request could not be created");
 
             req.UserAgent = @"osu!";
             req.KeepAlive = useFallbackPath != true;
@@ -304,10 +305,11 @@ namespace osu.Framework.IO.Network
         /// </summary>
         public void Perform()
         {
-            Debug.Assert(workItem == null);
+            if (workItem != null)
+                throw new InvalidOperationException("Can not perform a web request multiple times.");
 
-            workItem = threadPool.QueueWorkItem(perform);
-            if (threadPool.InUseThreads == threadPool.MaxThreads)
+            workItem = thread_pool.QueueWorkItem(perform);
+            if (thread_pool.InUseThreads == thread_pool.MaxThreads)
                 logger.Add(@"WARNING: ThreadPool is saturated!", LogLevel.Error);
         }
 
@@ -321,7 +323,7 @@ namespace osu.Framework.IO.Network
             try
             {
                 reportForwardProgress();
-                threadPool.QueueWorkItem(checkTimeoutLoop);
+                thread_pool.QueueWorkItem(checkTimeoutLoop);
 
                 requestBody = new MemoryStream();
 
@@ -453,12 +455,12 @@ namespace osu.Framework.IO.Network
             try
             {
                 response = request.GetResponse() as HttpWebResponse;
-                Debug.Assert(response != null);
+                Trace.Assert(response != null);
 
                 Started?.Invoke(this);
 
                 internalResponseStream = response.GetResponseStream();
-                Debug.Assert(internalResponseStream != null);
+                Trace.Assert(internalResponseStream != null);
 
 #if !DEBUG
                 checkCertificate();
@@ -502,7 +504,7 @@ namespace osu.Framework.IO.Network
                 return;
 
             //if it's null at this point we don't mind throwing an exception.
-            Debug.Assert(request.ServicePoint.Certificate != null);
+            Trace.Assert(request.ServicePoint.Certificate != null);
 
             //this is enough for now to assume we have a valid certificate.
             if (new X509Certificate2(request.ServicePoint.Certificate).Subject.Contains(@"CN=*.ppy.sh"))
@@ -519,7 +521,7 @@ namespace osu.Framework.IO.Network
             Exception exc = null;
             bool completed = false;
 
-            Finished += delegate (WebRequest r, Exception e)
+            Finished += delegate(WebRequest r, Exception e)
             {
                 exc = e;
                 completed = true;
@@ -686,6 +688,7 @@ namespace osu.Framework.IO.Network
             try
             {
                 if (request?.ServicePoint.BindIPEndPointDelegate != null)
+                    // ReSharper disable once DelegateSubtraction
                     request.ServicePoint.BindIPEndPointDelegate -= bindEndPoint;
             }
             catch
@@ -695,11 +698,11 @@ namespace osu.Framework.IO.Network
 
         #region Timeout Handling
 
-        long lastAction;
+        private long lastAction;
 
-        long timeSinceLastAction => (DateTime.Now.Ticks - lastAction) / TimeSpan.TicksPerMillisecond;
+        private long timeSinceLastAction => (DateTime.Now.Ticks - lastAction) / TimeSpan.TicksPerMillisecond;
 
-        bool hasExceededTimeout => timeSinceLastAction > Timeout;
+        private bool hasExceededTimeout => timeSinceLastAction > Timeout;
 
         private object checkTimeoutLoop(object state)
         {

@@ -10,36 +10,53 @@ using osu.Framework.Platform;
 using osu.Framework.Threading;
 using OpenTK.Input;
 using KeyboardState = osu.Framework.Input.KeyboardState;
+using osu.Framework.Statistics;
 
 namespace osu.Framework.Desktop.Input.Handlers.Keyboard
 {
-    class OpenTKKeyboardHandler : InputHandler
+    internal class OpenTKKeyboardHandler : InputHandler
     {
+        private ScheduledDelegate scheduled;
+
         public override bool IsActive => true;
 
         public override int Priority => 0;
 
-        public override bool Initialize(BasicGameHost host)
+        private OpenTK.Input.KeyboardState lastState;
+
+        public override bool Initialize(GameHost host)
         {
-            host.InputThread.Scheduler.Add(new ScheduledDelegate(delegate
+            host.InputThread.Scheduler.Add(scheduled = new ScheduledDelegate(delegate
             {
-                PendingStates.Enqueue(new InputState
-                {
-                    Keyboard = new TkKeyboardState(host.IsActive ? OpenTK.Input.Keyboard.GetState() : new OpenTK.Input.KeyboardState())
-                });
+                var state = host.IsActive ? OpenTK.Input.Keyboard.GetState() : new OpenTK.Input.KeyboardState();
+
+                if (state.Equals(lastState))
+                    return;
+
+                lastState = state;
+
+                PendingStates.Enqueue(new InputState { Keyboard = new TkKeyboardState(state) });
+
+                FrameStatistics.Increment(StatisticsCounterType.KeyEvents);
             }, 0, 0));
 
             return true;
         }
 
-        class TkKeyboardState : KeyboardState
+        protected override void Dispose(bool disposing)
         {
-            private static IEnumerable<Key> allKeys = Enum.GetValues(typeof(Key)).Cast<Key>();
+            base.Dispose(disposing);
+            scheduled.Cancel();
+        }
+
+        private class TkKeyboardState : KeyboardState
+        {
+            private static readonly IEnumerable<Key> all_keys = Enum.GetValues(typeof(Key)).Cast<Key>();
 
             public TkKeyboardState(OpenTK.Input.KeyboardState tkState)
             {
                 if (tkState.IsAnyKeyDown)
-                    Keys = allKeys.Where(tkState.IsKeyDown);
+                    Keys = all_keys.Where(tkState.IsKeyDown);
             }
         }
     }

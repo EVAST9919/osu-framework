@@ -7,17 +7,20 @@ using System;
 
 namespace osu.Framework.Graphics.Visualisation
 {
-    class FlashyBox : Box
+    internal class FlashyBox : Box
     {
-        Drawable target;
-        Func<Drawable, Quad> getScreenSpaceQuad;
+        private Drawable target;
+        private readonly Func<Drawable, Quad> getScreenSpaceQuad;
 
         public FlashyBox(Func<Drawable, Quad> getScreenSpaceQuad)
         {
             this.getScreenSpaceQuad = getScreenSpaceQuad;
         }
 
-        public Drawable Target { set { target = value; } }
+        public Drawable Target
+        {
+            set { target = value; }
+        }
 
         public override Quad ScreenSpaceDrawQuad => target == null ? new Quad() : getScreenSpaceQuad(target);
     }

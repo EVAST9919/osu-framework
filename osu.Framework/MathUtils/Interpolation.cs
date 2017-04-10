@@ -2,11 +2,10 @@
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using System;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
-using osu.Framework.Graphics.Transformations;
 using OpenTK;
 using OpenTK.Graphics;
-using System.Diagnostics;
 
 namespace osu.Framework.MathUtils
 {
@@ -16,8 +15,10 @@ namespace osu.Framework.MathUtils
 
         public static double Damp(double start, double final, double smoothing, double delta)
         {
-            Debug.Assert(smoothing >= 0 && smoothing <= 1);
-            Debug.Assert(delta >= 0);
+            if (smoothing < 0 || smoothing > 1)
+                throw new ArgumentOutOfRangeException($"{nameof(smoothing)} has to lie in [0,1], but is {smoothing}.", nameof(smoothing));
+            if (delta < 0)
+                throw new ArgumentOutOfRangeException($"{nameof(delta)} has to be bigger than 0, but is {delta}.", nameof(delta));
 
             return Lerp(start, final, 1 - (float)Math.Pow(smoothing, delta));
         }
@@ -40,7 +41,7 @@ namespace osu.Framework.MathUtils
                 (float)Math.Max(0, Math.Min(1, ApplyEasing(easing, current, startColour.A, endColour.A - startColour.A, duration))));
         }
 
-        public static float ValueAt(double time, float val1, float val2, double startTime, double endTime, EasingTypes easing = EasingTypes.None)
+        public static double ValueAt(double time, double val1, double val2, double startTime, double endTime, EasingTypes easing = EasingTypes.None)
         {
             if (val1 == val2)
                 return val1;
@@ -53,7 +54,7 @@ namespace osu.Framework.MathUtils
             if (duration == 0)
                 return val2;
 
-            return (float)ApplyEasing(easing, current, val1, val2 - val1, duration);
+            return ApplyEasing(easing, current, val1, val2 - val1, duration);
         }
 
         public static Vector2 ValueAt(double time, Vector2 val1, Vector2 val2, double startTime, double endTime, EasingTypes easing = EasingTypes.None)
@@ -101,7 +102,7 @@ namespace osu.Framework.MathUtils
                     return -change * (time /= duration) * (time - 2) + initial;
                 case EasingTypes.InOutQuad:
                     if ((time /= duration / 2) < 1) return change / 2 * time * time + initial;
-                    return -change / 2 * ((--time) * (time - 2) - 1) + initial;
+                    return -change / 2 * (--time * (time - 2) - 1) + initial;
                 case EasingTypes.InCubic:
                     return change * (time /= duration) * time * time + initial;
                 case EasingTypes.OutCubic:
@@ -120,6 +121,8 @@ namespace osu.Framework.MathUtils
                     return change * (time /= duration) * time * time * time * time + initial;
                 case EasingTypes.OutQuint:
                     return change * ((time = time / duration - 1) * time * time * time * time + 1) + initial;
+                case EasingTypes.OutPow10:
+                    return change * ((time = time / duration - 1) * Math.Pow(time, 10) + 1) + initial;
                 case EasingTypes.InOutQuint:
                     if ((time /= duration / 2) < 1) return change / 2 * time * time * time * time * time + initial;
                     return change / 2 * ((time -= 2) * time * time * time * time + 2) + initial;
@@ -132,7 +135,7 @@ namespace osu.Framework.MathUtils
                 case EasingTypes.InExpo:
                     return change * Math.Pow(2, 10 * (time / duration - 1)) + initial;
                 case EasingTypes.OutExpo:
-                    return (time == duration) ? initial + change : change * (-Math.Pow(2, -10 * time / duration) + 1) + initial;
+                    return time == duration ? initial + change : change * (-Math.Pow(2, -10 * time / duration) + 1) + initial;
                 case EasingTypes.InOutExpo:
                     if ((time /= duration / 2) < 1) return change / 2 * Math.Pow(2, 10 * (time - 1)) + initial;
                     return change / 2 * (-Math.Pow(2, -10 * --time) + 2) + initial;
@@ -144,98 +147,98 @@ namespace osu.Framework.MathUtils
                     if ((time /= duration / 2) < 1) return -change / 2 * (Math.Sqrt(1 - time * time) - 1) + initial;
                     return change / 2 * (Math.Sqrt(1 - (time -= 2) * time) + 1) + initial;
                 case EasingTypes.InElastic:
-                {
-                    if ((time /= duration) == 1) return initial + change;
-
-                    var p = duration * .3;
-                    var a = change;
-                    double s;
-                    if (a < Math.Abs(change))
                     {
-                        a = change;
-                        s = p / 4;
-                    }
-                    else
+                        if ((time /= duration) == 1) return initial + change;
+
+                        var p = duration * .3;
+                        var a = change;
+                        double s;
+                        if (a < Math.Abs(change))
+                        {
+                            a = change;
+                            s = p / 4;
+                        }
+                        else
                             s = p / (2 * MathHelper.Pi) * Math.Asin(change / a);
-                    return -(a * Math.Pow(2, 10 * (time -= 1)) * Math.Sin((time * duration - s) * (2 * MathHelper.Pi) / p)) + initial;
-                }
+                        return -(a * Math.Pow(2, 10 * (time -= 1)) * Math.Sin((time * duration - s) * (2 * MathHelper.Pi) / p)) + initial;
+                    }
                 case EasingTypes.OutElastic:
-                {
-                    if ((time /= duration) == 1) return initial + change;
-
-                    var p = duration * .3;
-                    var a = change;
-                    double s;
-                    if (a < Math.Abs(change))
                     {
-                        a = change;
-                        s = p / 4;
+                        if ((time /= duration) == 1) return initial + change;
+
+                        var p = duration * .3;
+                        var a = change;
+                        double s;
+                        if (a < Math.Abs(change))
+                        {
+                            a = change;
+                            s = p / 4;
+                        }
+                        else s = p / (2 * MathHelper.Pi) * Math.Asin(change / a);
+                        return a * Math.Pow(2, -10 * time) * Math.Sin((time * duration - s) * (2 * MathHelper.Pi) / p) + change + initial;
                     }
-                    else s = p / (2 * MathHelper.Pi) * Math.Asin(change / a);
-                    return a * Math.Pow(2, -10 * time) * Math.Sin((time * duration - s) * (2 * MathHelper.Pi) / p) + change + initial;
-                }
                 case EasingTypes.OutElasticHalf:
-                {
-                    if ((time /= duration) == 1) return initial + change;
-
-                    var p = duration * .3;
-                    var a = change;
-                    double s;
-                    if (a < Math.Abs(change))
                     {
-                        a = change;
-                        s = p / 4;
+                        if ((time /= duration) == 1) return initial + change;
+
+                        var p = duration * .3;
+                        var a = change;
+                        double s;
+                        if (a < Math.Abs(change))
+                        {
+                            a = change;
+                            s = p / 4;
+                        }
+                        else s = p / (2 * MathHelper.Pi) * Math.Asin(change / a);
+                        return a * Math.Pow(2, -10 * time) * Math.Sin((0.5f * time * duration - s) * (2 * MathHelper.Pi) / p) + change + initial;
                     }
-                    else s = p / (2 * MathHelper.Pi) * Math.Asin(change / a);
-                    return a * Math.Pow(2, -10 * time) * Math.Sin((0.5f * time * duration - s) * (2 * MathHelper.Pi) / p) + change + initial;
-                }
                 case EasingTypes.OutElasticQuarter:
-                {
-                    if ((time /= duration) == 1) return initial + change;
-
-                    var p = duration * .3;
-                    var a = change;
-                    double s;
-                    if (a < Math.Abs(change))
                     {
-                        a = change;
-                        s = p / 4;
+                        if ((time /= duration) == 1) return initial + change;
+
+                        var p = duration * .3;
+                        var a = change;
+                        double s;
+                        if (a < Math.Abs(change))
+                        {
+                            a = change;
+                            s = p / 4;
+                        }
+                        else s = p / (2 * MathHelper.Pi) * Math.Asin(change / a);
+                        return a * Math.Pow(2, -10 * time) * Math.Sin((0.25f * time * duration - s) * (2 * MathHelper.Pi) / p) + change + initial;
                     }
-                    else s = p / (2 * MathHelper.Pi) * Math.Asin(change / a);
-                    return a * Math.Pow(2, -10 * time) * Math.Sin((0.25f * time * duration - s) * (2 * MathHelper.Pi) / p) + change + initial;
-                }
                 case EasingTypes.InOutElastic:
-                {
-                    if ((time /= duration / 2) == 2) return initial + change;
-
-                    var p = duration * (.3 * 1.5);
-                    var a = change;
-                    double s;
-                    if (a < Math.Abs(change))
                     {
-                        a = change;
-                        s = p / 4;
+                        if ((time /= duration / 2) == 2) return initial + change;
+
+                        var p = duration * (.3 * 1.5);
+                        var a = change;
+                        double s;
+                        if (a < Math.Abs(change))
+                        {
+                            a = change;
+                            s = p / 4;
+                        }
+                        else s = p / (2 * MathHelper.Pi) * Math.Asin(change / a);
+                        if (time < 1) return -.5 * (a * Math.Pow(2, 10 * (time -= 1)) * Math.Sin((time * duration - s) * (2 * MathHelper.Pi) / p)) + initial;
+                        return a * Math.Pow(2, -10 * (time -= 1)) * Math.Sin((time * duration - s) * (2 * MathHelper.Pi) / p) * .5 + change + initial;
                     }
-                    else s = p / (2 * MathHelper.Pi) * Math.Asin(change / a);
-                    if (time < 1) return -.5 * (a * Math.Pow(2, 10 * (time -= 1)) * Math.Sin((time * duration - s) * (2 * MathHelper.Pi) / p)) + initial;
-                    return a * Math.Pow(2, -10 * (time -= 1)) * Math.Sin((time * duration - s) * (2 * MathHelper.Pi) / p) * .5 + change + initial;
-                }
                 case EasingTypes.InBack:
-                {
-                    var s = 1.70158;
-                    return change * (time /= duration) * time * ((s + 1) * time - s) + initial;
-                }
+                    {
+                        const double s = 1.70158;
+                        return change * (time /= duration) * time * ((s + 1) * time - s) + initial;
+                    }
                 case EasingTypes.OutBack:
-                {
-                    var s = 1.70158;
-                    return change * ((time = time / duration - 1) * time * ((s + 1) * time + s) + 1) + initial;
-                }
+                    {
+                        const double s = 1.70158;
+                        return change * ((time = time / duration - 1) * time * ((s + 1) * time + s) + 1) + initial;
+                    }
                 case EasingTypes.InOutBack:
-                {
-                    var s = 1.70158;
-                    if ((time /= duration / 2) < 1) return change / 2 * (time * time * (((s *= 1.525) + 1) * time - s)) + initial;
-                    return change / 2 * ((time -= 2) * time * (((s *= 1.525) + 1) * time + s) + 2) + initial;
-                }
+                    {
+                        double s = 1.70158;
+                        if ((time /= duration / 2) < 1) return change / 2 * (time * time * (((s *= 1.525) + 1) * time - s)) + initial;
+                        return change / 2 * ((time -= 2) * time * (((s *= 1.525) + 1) * time + s) + 2) + initial;
+                    }
                 case EasingTypes.InBounce:
                     return change - ApplyEasing(EasingTypes.OutBounce, duration - time, 0, change, duration) + initial;
                 case EasingTypes.OutBounce:

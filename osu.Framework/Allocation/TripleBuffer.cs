@@ -12,15 +12,15 @@ namespace osu.Framework.Allocation
     /// </summary>
     public class TripleBuffer<T>
     {
-        private ObjectUsage<T>[] buffers = new ObjectUsage<T>[3];
+        private readonly ObjectUsage<T>[] buffers = new ObjectUsage<T>[3];
 
-        int read;
-        int write;
-        int lastWrite = -1;
+        private int read;
+        private int write;
+        private int lastWrite = -1;
 
-        long currentFrame;
+        private long currentFrame;
 
-        Action<ObjectUsage<T>, UsageType> finishDelegate;
+        private readonly Action<ObjectUsage<T>, UsageType> finishDelegate;
 
         public TripleBuffer()
         {
@@ -35,7 +35,7 @@ namespace osu.Framework.Allocation
                 case UsageType.Write:
                     lock (buffers)
                     {
-                        while ((buffers[write]?.Usage == UsageType.Read) || write == lastWrite)
+                        while (buffers[write]?.Usage == UsageType.Read || write == lastWrite)
                             write = (write + 1) % 3;
                     }
 
@@ -65,7 +65,6 @@ namespace osu.Framework.Allocation
                     }
 
                     return buffers[read];
-
             }
 
             return null;

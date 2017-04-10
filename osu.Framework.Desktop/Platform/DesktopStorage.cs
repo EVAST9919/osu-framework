@@ -13,9 +13,10 @@ using osu.Framework.Logging;
 
 namespace osu.Framework.Desktop.Platform
 {
-    public class DesktopStorage : BasicStorage
+    public class DesktopStorage : Storage
     {
-        public DesktopStorage(string baseName) : base(baseName)
+        public DesktopStorage(string baseName)
+            : base(baseName)
         {
             //todo: this is obviously not the right way to do this.
             Logger.LogDirectory = Path.Combine(BasePath, @"logs");
@@ -35,6 +36,10 @@ namespace osu.Framework.Desktop.Platform
         public override Stream GetStream(string path, FileAccess access = FileAccess.Read, FileMode mode = FileMode.OpenOrCreate)
         {
             path = Path.Combine(BasePath, path);
+
+            if (string.IsNullOrEmpty(path))
+                throw new ArgumentNullException(nameof(path));
+
             switch (access)
             {
                 case FileAccess.Read:
@@ -46,7 +51,7 @@ namespace osu.Framework.Desktop.Platform
                     return File.Open(path, mode, access);
             }
         }
-        
+
         public override SQLiteConnection GetDatabase(string name)
         {
             Directory.CreateDirectory(BasePath);

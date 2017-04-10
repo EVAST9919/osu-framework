@@ -2,26 +2,23 @@
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
 using osu.Framework.Graphics.Containers;
-using System.Linq;
 using osu.Framework.Graphics.OpenGL;
 using osu.Framework.Graphics.Textures;
 using OpenTK.Graphics.ES30;
 using osu.Framework.Threading;
+using System.Collections.Generic;
 
 namespace osu.Framework.Graphics.Performance
 {
-    class PerformanceOverlay : FlowContainer, IStateful<FrameStatisticsMode>
+    internal class PerformanceOverlay : FillFlowContainer<FrameStatisticsDisplay>, IStateful<FrameStatisticsMode>
     {
-        TextureAtlas atlas;
+        private readonly TextureAtlas atlas;
 
         private FrameStatisticsMode state;
 
         public FrameStatisticsMode State
         {
-            get
-            {
-                return state;
-            }
+            get { return state; }
 
             set
             {
@@ -40,16 +37,22 @@ namespace osu.Framework.Graphics.Performance
                         break;
                 }
 
-                foreach (FrameStatisticsDisplay d in Children.Cast<FrameStatisticsDisplay>())
+                foreach (FrameStatisticsDisplay d in Children)
                     d.State = state;
             }
         }
 
-        public void AddThread(GameThread thread) => Add(new FrameStatisticsDisplay(thread, atlas));
+        public List<GameThread> Threads = new List<GameThread>();
+
+        public void CreateDisplays()
+        {
+            foreach (GameThread t in Threads)
+                Add(new FrameStatisticsDisplay(t, atlas));
+        }
 
         public PerformanceOverlay()
         {
-            Direction = FlowDirections.Vertical;
+            Direction = FillDirection.Vertical;
             atlas = new TextureAtlas(GLWrapper.MaxTextureSize, GLWrapper.MaxTextureSize, true, All.Nearest);
         }
     }

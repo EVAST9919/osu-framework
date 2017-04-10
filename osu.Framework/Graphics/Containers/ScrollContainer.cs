@@ -4,7 +4,6 @@
 using System;
 using System.Diagnostics;
 using osu.Framework.Graphics.Primitives;
-using osu.Framework.Graphics.Transformations;
 using osu.Framework.Input;
 using osu.Framework.MathUtils;
 using OpenTK;
@@ -13,7 +12,7 @@ using osu.Framework.Graphics.Sprites;
 
 namespace osu.Framework.Graphics.Containers
 {
-    public class ScrollContainer : Container
+    public class ScrollContainer : Container, DelayedLoadWrapper.IOnScreenOptimisingContainer
     {
         /// <summary>
         /// Determines whether the scroll dragger appears on the left side. If not, then it always appears on the right side.
@@ -31,6 +30,7 @@ namespace osu.Framework.Graphics.Containers
         }
 
         private bool scrollDraggerVisible = true;
+
         public bool ScrollDraggerVisible
         {
             get { return scrollDraggerVisible; }
@@ -41,8 +41,8 @@ namespace osu.Framework.Graphics.Containers
             }
         }
 
-        private Container content;
-        private ScrollBar scrollDragger;
+        private readonly Container content;
+        private readonly ScrollBar scrollDragger;
 
 
         private bool scrollDraggerOverlapsContent = true;
@@ -115,22 +115,29 @@ namespace osu.Framework.Graphics.Containers
 
         protected override Container<Drawable> Content => content;
 
+        public bool IsScrolledToEnd(float lenience = Precision.FLOAT_EPSILON) => Precision.AlmostBigger(target, scrollableExtent, lenience);
+
+        /// <summary>
+        /// The container holding all children which are getting scrolled around.
+        /// </summary>
+        public Container<Drawable> ScrollContent => content;
+
         private bool isDragging;
 
-        private Direction scrollDir;
+        private readonly Direction scrollDir;
         private int scrollDim => (int)scrollDir;
 
         public ScrollContainer(Direction scrollDir = Direction.Vertical)
         {
             this.scrollDir = scrollDir;
 
-            RelativeSizeAxes = Axes.Both;
             Masking = true;
 
             Axes scrollAxis = scrollDir == Direction.Horizontal ? Axes.X : Axes.Y;
             AddInternal(new Drawable[]
             {
-                content = new Container {
+                content = new Container
+                {
                     RelativeSizeAxes = Axes.Both & ~scrollAxis,
                     AutoSizeAxes = scrollAxis,
                 },
@@ -162,15 +169,15 @@ namespace osu.Framework.Graphics.Containers
             {
                 if (scrollDir == Direction.Vertical)
                 {
-                    content.Padding = ScrollDraggerAnchor == Anchor.TopLeft ?
-                        new MarginPadding { Left = scrollDragger.Width } :
-                        new MarginPadding { Right = scrollDragger.Width };
+                    content.Padding = ScrollDraggerAnchor == Anchor.TopLeft
+                        ? new MarginPadding { Left = scrollDragger.Width }
+                        : new MarginPadding { Right = scrollDragger.Width };
                 }
                 else
                 {
-                    content.Padding = ScrollDraggerAnchor == Anchor.TopLeft ?
-                        new MarginPadding { Top = scrollDragger.Height } :
-                        new MarginPadding { Bottom = scrollDragger.Height };
+                    content.Padding = ScrollDraggerAnchor == Anchor.TopLeft
+                        ? new MarginPadding { Top = scrollDragger.Height }
+                        : new MarginPadding { Bottom = scrollDragger.Height };
                 }
             }
         }
@@ -205,7 +212,7 @@ namespace osu.Framework.Graphics.Containers
 
         protected override bool OnDrag(InputState state)
         {
-            Debug.Assert(isDragging, "We should never receive OnDrag if we are not dragging.");
+            Trace.Assert(isDragging, "We should never receive OnDrag if we are not dragging.");
 
             double currentTime = Time.Current;
             double timeDelta = currentTime - lastDragTime;
@@ -229,7 +236,7 @@ namespace osu.Framework.Graphics.Containers
 
         protected override bool OnDragEnd(InputState state)
         {
-            Debug.Assert(isDragging, "We should never receive OnDragEnd if we are not dragging.");
+            Trace.Assert(isDragging, "We should never receive OnDragEnd if we are not dragging.");
 
             isDragging = false;
 
@@ -261,7 +268,25 @@ namespace osu.Framework.Graphics.Containers
 
         private void onScrollbarMovement(float value) => scrollTo(clamp(value / scrollDragger.Size[scrollDim]), false);
 
+        public void OffsetScrollPosition(float offset)
+        {
+            target += offset;
+            Current += offset;
+        }
+
         private void offset(float value, bool animated, double distanceDecay = float.PositiveInfinity) => scrollTo(target + value, animated, distanceDecay);
+
+        /// <summary>
+        /// Scroll to the end of available content.
+        /// </summary>
+        /// <param name="animated">Whether to animate the movement.</param>
+        /// <param name="allowDuringDrag">Whether we should interrupt a user's active drag.</param>
+        public void ScrollToEnd(bool animated = true, bool allowDuringDrag = false)
+        {
+            if (!isDragging || allowDuringDrag) scrollTo(scrollableExtent, animated, DistanceDecayJump);
+        }
+
+        public void ScrollBy(float offset, bool animated = true) => scrollTo(target + offset, animated);
 
         public void ScrollTo(float value, bool animated = true) => scrollTo(value, animated, DistanceDecayJump);
 
@@ -295,7 +320,7 @@ namespace osu.Framework.Graphics.Containers
 
                 // Secondly, we would like to quickly approach the target while we are out of bounds.
                 // This is simulating a "strong" clamping force towards the target.
-                if ((Current < target && target < 0) || (Current > target && target > scrollableExtent))
+                if (Current < target && target < 0 || Current > target && target > scrollableExtent)
                     localDistanceDecay = distance_decay_clamping * 2;
 
                 // Lastly, we gradually nudge the target towards valid bounds.
@@ -321,8 +346,8 @@ namespace osu.Framework.Graphics.Containers
             updateSize();
             updatePosition();
 
-            scrollDragger?.MoveTo(scrollDim, Current * scrollDragger.Size[scrollDim]);
-            content.MoveTo(scrollDim, -Current);
+            scrollDragger?.MoveTo(scrollDir, Current * scrollDragger.Size[scrollDim]);
+            content.MoveTo(scrollDir, -Current);
         }
 
         private class ScrollBar : Container
@@ -332,11 +357,11 @@ namespace osu.Framework.Graphics.Containers
             private static readonly Color4 hover_colour = Color4.White;
             private static readonly Color4 default_colour = Color4.LightGray;
             private static readonly Color4 highlight_colour = Color4.GreenYellow;
-            private Box box;
+            private readonly Box box;
 
             private float dragOffset;
-            
-            private int scrollDim;
+
+            private readonly int scrollDim;
 
             public ScrollBar(Direction scrollDir)
             {
@@ -356,8 +381,10 @@ namespace osu.Framework.Graphics.Containers
 
             public void ResizeTo(float val, int duration = 0, EasingTypes easing = EasingTypes.None)
             {
-                Vector2 size = new Vector2(10);
-                size[scrollDim] = val;
+                Vector2 size = new Vector2(10)
+                {
+                    [scrollDim] = val
+                };
                 ResizeTo(size, duration, easing);
             }
 

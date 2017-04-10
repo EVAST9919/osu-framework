@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 
@@ -14,9 +13,9 @@ namespace osu.Framework.Allocation
     {
         public delegate object ObjectActivator(DependencyContainer dc, object instance);
 
-        private ConcurrentDictionary<Type, ObjectActivator> activators = new ConcurrentDictionary<Type, ObjectActivator>();
-        private ConcurrentDictionary<Type, object> cache = new ConcurrentDictionary<Type, object>();
-        private HashSet<Type> cacheable = new HashSet<Type>();
+        private readonly ConcurrentDictionary<Type, ObjectActivator> activators = new ConcurrentDictionary<Type, ObjectActivator>();
+        private readonly ConcurrentDictionary<Type, object> cache = new ConcurrentDictionary<Type, object>();
+        private readonly HashSet<Type> cacheable = new HashSet<Type>();
 
         public DependencyContainer()
         {
@@ -31,7 +30,8 @@ namespace osu.Framework.Allocation
 
         private void register(Type type, bool lazy)
         {
-            Debug.Assert(!activators.ContainsKey(type), $@"Type {type.FullName} should not be registered twice");
+            if (activators.ContainsKey(type))
+                throw new InvalidOperationException($@"Type {type.FullName} can not be registered twice");
 
             var initialize = getLoaderMethod(type);
             var constructor = type.GetConstructors().SingleOrDefault(c => c.GetParameters().Length == 0);
@@ -43,7 +43,7 @@ namespace osu.Framework.Allocation
                 var init = getLoaderMethod(parent);
                 if (init != null)
                     initializerMethods.Insert(0, init);
-                parent = parent.BaseType;
+                parent = parent?.BaseType;
             }
             if (initialize != null)
                 initializerMethods.Add(initialize);
@@ -52,16 +52,16 @@ namespace osu.Framework.Allocation
             {
                 var permitNull = initializer.GetCustomAttribute<BackgroundDependencyLoader>().PermitNulls;
                 var parameters = initializer.GetParameters().Select(p => p.ParameterType)
-                    .Select(t => (Func<object>)(() =>
-                        {
-                            var val = get(t);
-                            if (val == null && !permitNull)
-                            {
-                                throw new InvalidOperationException(
-                                    $@"Type {t.FullName} is not registered, and is a dependency of {type.FullName}");
-                            }
-                            return val;
-                        })).ToList();
+                                            .Select(t => (Func<object>)(() =>
+                                            {
+                                                var val = get(t);
+                                                if (val == null && !permitNull)
+                                                {
+                                                    throw new InvalidOperationException(
+                                                        $@"Type {t.FullName} is not registered, and is a dependency of {type.FullName}");
+                                                }
+                                                return val;
+                                            })).ToList();
                 // Test that we already have all the dependencies registered
                 if (!lazy)
                     parameters.ForEach(p => p());
@@ -107,7 +107,8 @@ namespace osu.Framework.Allocation
         /// </summary>
         public T Cache<T>(T instance = null, bool overwrite = false, bool lazy = false) where T : class
         {
-            Debug.Assert(overwrite || !cache.ContainsKey(typeof(T)), @"We have already cached one of these");
+            if (!overwrite && cache.ContainsKey(typeof(T)))
+                throw new InvalidOperationException($@"Type {typeof(T).FullName} is already cached");
             if (instance == null)
                 instance = Get<T>(false);
             cacheable.Add(typeof(T));
@@ -119,12 +120,17 @@ namespace osu.Framework.Allocation
         {
             if (cache.ContainsKey(type))
                 return cache[type];
-            if (!activators.ContainsKey(type))
-                return null; // Or an exception?
-            object instance = activators[type](this, null);
-            if (cacheable.Contains(type))
-                cache[type] = instance;
-            return instance;
+
+            //we don't ever want to instantiate for now, as this breaks expectations when using permitNull.
+            //need to revisit this when/if it is required.
+            return null;
+
+            //if (!activators.ContainsKey(type))
+            //    return null; // Or an exception?
+            //object instance = activators[type](this, null);
+            //if (cacheable.Contains(type))
+            //    cache[type] = instance;
+            //return instance;
         }
 
         /// <summary>
@@ -144,8 +150,10 @@ namespace osu.Framework.Allocation
         public void Initialize<T>(T instance, bool autoRegister = true, bool lazy = false) where T : class
         {
             var type = instance.GetType();
-            if (autoRegister && !activators.ContainsKey(type))
-                register(type, lazy);
+
+            lock (activators)
+                if (autoRegister && !activators.ContainsKey(type))
+                    register(type, lazy);
 
             ObjectActivator activator;
 
