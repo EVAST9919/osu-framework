@@ -25,6 +25,7 @@ using OpenTK.Graphics;
 using OpenTK.Input;
 using KeyboardState = osu.Framework.Input.KeyboardState;
 using MouseState = osu.Framework.Input.MouseState;
+using osu.Framework.Allocation;
 
 namespace osu.Framework.Graphics
 {
@@ -118,17 +119,17 @@ namespace osu.Framework.Graphics
         /// Loads this Drawable asynchronously.
         /// </summary>
         /// <param name="game">The game to load this Drawable on.</param>
-        /// <param name="clock">The clock of our future parent.</param>
+        /// <param name="target">The target of the Drawable may eventually be loaded into.</param>
         /// <param name="onLoaded">Callback to be invoked asynchronously after loading is complete.</param>
         /// <returns>The task which is used for loading and callbacks.</returns>
-        internal Task LoadAsync(Game game, IFrameBasedClock clock, Action<Drawable> onLoaded = null)
+        internal Task LoadAsync(Game game, Drawable target, Action<Drawable> onLoaded = null)
         {
             if (loadState != LoadState.NotLoaded)
                 throw new InvalidOperationException($@"{nameof(LoadAsync)} may not be called more than once on the same Drawable.");
 
             loadState = LoadState.Loading;
 
-            return loadTask = Task.Run(() => Load(game, clock)).ContinueWith(task => game.Schedule(() =>
+            return loadTask = Task.Run(() => Load(target.Clock, target.Dependencies)).ContinueWith(task => game.Schedule(() =>
             {
                 task.ThrowIfFaulted();
                 onLoaded?.Invoke(this);
@@ -138,7 +139,22 @@ namespace osu.Framework.Graphics
 
         private static readonly StopwatchClock perf = new StopwatchClock(true);
 
-        internal void Load(Game game, IFrameBasedClock clock)
+        /// <summary>
+        /// Create a local dependency container which will be used by ourselves and all our nested children.
+        /// If not overridden, the load-time parent's dependency tree will be used.
+        /// </summary>
+        /// <param name="parent">The parent <see cref="DependencyContainer"/> which should be passed through if we want fallback lookups to work.</param>
+        /// <returns>A new dependency container to be stored against this Drawable.</returns>
+        protected virtual DependencyContainer CreateLocalDependencies(DependencyContainer parent) => parent;
+
+        protected DependencyContainer Dependencies { get; private set; }
+
+        /// <summary>
+        /// Loads this drawable, including the gathering of dependencies and initialisation of required resources.
+        /// </summary>
+        /// <param name="clock">The clock we should use by default.</param>
+        /// <param name="dependencies">The dependency tree we will inherit by default. May be extended via <see cref="CreateLocalDependencies(DependencyContainer)"/></param>
+        internal void Load(IFrameBasedClock clock, DependencyContainer dependencies)
         {
             // Blocks when loading from another thread already.
             lock (loadLock)
@@ -161,7 +177,12 @@ namespace osu.Framework.Graphics
                 UpdateClock(clock);
 
                 double t1 = perf.CurrentTime;
-                game.Dependencies.Initialize(this);
+
+                // get our dependencies from our parent, but allow local overriding of our inherited dependency container
+                Dependencies = CreateLocalDependencies(dependencies);
+
+                Dependencies.Initialize(this);
+
                 double elapsed = perf.CurrentTime - t1;
                 if (perf.CurrentTime > 1000 && elapsed > 50 && ThreadSafety.IsUpdateThread)
                     Logger.Log($@"Drawable [{ToString()}] took {elapsed:0.00}ms to load and was not async!", LoggingTarget.Performance);
@@ -332,7 +353,7 @@ namespace osu.Framework.Graphics
         /// Called once every frame.
         /// </summary>
         /// <returns>False if the drawable should not be updated.</returns>
-        internal virtual bool UpdateSubTree()
+        public virtual bool UpdateSubTree()
         {
             if (isDisposed)
                 throw new ObjectDisposedException(ToString(), "Disposed Drawables may never be in the scene graph.");
@@ -1801,6 +1822,27 @@ namespace osu.Framework.Graphics
             return this;
         }
 
+        /// <summary>
+        /// Start a sequence of transforms with a (cumulative) relative delay applied.
+        /// </summary>
+        /// <param name="delay">The offset in milliseconds from current time. Note that this stacks with other nested sequences.</param>
+        /// <param name="recursive">Whether this should be applied to all children.</param>
+        /// <returns>A <see cref="TransformSequence" /> to be used in a using() statement.</returns>
+        public TransformSequence BeginDelayedSequence(double delay, bool recursive = false) => new TransformSequence(this, delay, recursive);
+
+        /// <summary>
+        /// Start a sequence of transforms from an absolute time value.
+        /// </summary>
+        /// <param name="startOffset">The offset in milliseconds from absolute zero.</param>
+        /// <param name="recursive">Whether this should be applied to all children.</param>
+        /// <returns>A <see cref="TransformSequence" /> to be used in a using() statement.</returns>
+        /// <exception cref="InvalidOperationException">Absolute sequences should never be nested inside another existing sequence.</exception>
+        public TransformSequence BeginAbsoluteSequence(double startOffset = 0, bool recursive = false)
+        {
+            if (transformDelay != 0) throw new InvalidOperationException($"Cannot use {nameof(BeginAbsoluteSequence)} with a non-zero transform delay already present");
+            return new TransformSequence(this, -(Clock?.CurrentTime ?? 0) + startOffset, recursive);
+        }
+
         public void Loop(float delay = 0)
         {
             foreach (var t in Transforms)
@@ -1866,7 +1908,7 @@ namespace osu.Framework.Graphics
         /// <summary>
         /// The time to use for starting transforms which support <see cref="Delay(double, bool)"/>
         /// </summary>
-        protected double TransformStartTime => Clock != null ? Time.Current + transformDelay : 0;
+        protected double TransformStartTime => (Clock?.CurrentTime ?? 0) + transformDelay;
 
         public void TransformTo<TValue>(Func<TValue> currentValue, TValue newValue, double duration, EasingTypes easing, Transform<TValue> transform) where TValue : struct, IEquatable<TValue>
         {
@@ -2054,6 +2096,49 @@ namespace osu.Framework.Graphics
                 shortClass = $@"{Name} ({shortClass})";
 
             return $@"{shortClass} ({DrawPosition.X:#,0},{DrawPosition.Y:#,0}) {DrawSize.X:#,0}x{DrawSize.Y:#,0}";
+        }
+
+        /// <summary>
+        /// A disposable-pattern object to handle isolated sequences of transforms. Should only be used in using blocks.
+        /// </summary>
+        public class TransformSequence : IDisposable
+        {
+            private readonly Drawable us;
+            private readonly bool recursive;
+            private readonly double adjust;
+
+            public TransformSequence(Drawable us, double adjust, bool recursive = false)
+            {
+                this.recursive = recursive;
+                this.us = us;
+                this.adjust = adjust;
+
+                us.Delay(adjust, recursive);
+            }
+
+            #region IDisposable Support
+            private bool disposed;
+
+            protected virtual void Dispose(bool disposing)
+            {
+                if (!disposed)
+                {
+                    us.Delay(-adjust, recursive);
+                    disposed = true;
+                }
+            }
+
+            ~TransformSequence()
+            {
+                Dispose(false);
+            }
+
+            public void Dispose()
+            {
+                Dispose(true);
+                GC.SuppressFinalize(this);
+            }
+            #endregion
         }
     }
 

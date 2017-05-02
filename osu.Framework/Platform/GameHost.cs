@@ -23,6 +23,7 @@ using osu.Framework.Configuration;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using OpenTK.Input;
 using OpenTK.Graphics;
+using osu.Framework.Localisation;
 
 namespace osu.Framework.Platform
 {
@@ -35,6 +36,8 @@ namespace osu.Framework.Platform
         private FrameworkDebugConfigManager debugConfig;
 
         private FrameworkConfigManager config;
+
+        public LocalisationEngine Localisation { get; private set; }
 
         private void setActive(bool isActive)
         {
@@ -350,18 +353,14 @@ namespace osu.Framework.Platform
 
         private void bootstrapSceneGraph(Game game)
         {
-            var root = new UserInputManager
-            {
-                Clock = UpdateThread.Clock,
-                Children = new[] { game },
-            };
+            var root = new UserInputManager { Children = new[] { game } };
 
             Dependencies.Cache(root);
             Dependencies.Cache(game);
 
             game.SetHost(this);
 
-            root.Load(game, game.Clock);
+            root.Load(UpdateThread.Clock, Dependencies);
 
             //publish bootstrapped scene graph to all threads.
             Root = root;
@@ -402,6 +401,7 @@ namespace osu.Framework.Platform
         {
             Dependencies.Cache(debugConfig = new FrameworkDebugConfigManager());
             Dependencies.Cache(config = new FrameworkConfigManager(Storage));
+            Dependencies.Cache(Localisation = new LocalisationEngine(config));
 
             activeGCMode = debugConfig.GetBindable<GCLatencyMode>(FrameworkDebugConfig.ActiveGCMode);
             activeGCMode.ValueChanged += delegate { setLatencyMode(); };

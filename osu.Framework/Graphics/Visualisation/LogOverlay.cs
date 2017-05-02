@@ -46,8 +46,10 @@ namespace osu.Framework.Graphics.Visualisation
 
         private void logger_NewEntry(LogEntry entry)
         {
+#if !DEBUG
             if (entry.Level <= LogLevel.Verbose)
                 return;
+#endif
 
             Schedule(() =>
             {
@@ -58,9 +60,11 @@ namespace osu.Framework.Graphics.Visualisation
                 drawEntry.Position = new Vector2(-drawEntry.DrawWidth, 0);
 
                 drawEntry.FadeInFromZero(200);
-                drawEntry.Delay(200);
-                drawEntry.FadeOut(entry.Message.Length * 100, EasingTypes.InQuint);
-                drawEntry.Expire();
+                using (drawEntry.Delay(200))
+                {
+                    drawEntry.FadeOut(entry.Message.Length * 100, EasingTypes.InQuint);
+                    drawEntry.Expire();
+                }
             });
         }
 
