@@ -289,6 +289,9 @@ namespace osu.Framework.Graphics.UserInterface
 
         private bool removeCharacterOrSelection(bool sound = true)
         {
+            if (Current.Disabled)
+                return false;
+
             if (text.Length == 0) return false;
             if (selectionLength == 0 && selectionLeft == 0) return false;
 
@@ -365,6 +368,9 @@ namespace osu.Framework.Graphics.UserInterface
 
         private Drawable addCharacter(char c)
         {
+            if (Current.Disabled)
+                return null;
+
             if (char.IsControl(c)) return null;
 
             if (selectionLength > 0)
@@ -411,6 +417,9 @@ namespace osu.Framework.Graphics.UserInterface
             get { return text; }
             set
             {
+                if (Current.Disabled)
+                    return;
+
                 if (value == text)
                     return;
 
@@ -467,6 +476,45 @@ namespace osu.Framework.Graphics.UserInterface
             if (HandlePendingText(state)) return true;
 
             if (ReadOnly) return true;
+
+            if (state.Keyboard.ControlPressed)
+            {
+                //handling of function keys
+                switch (args.Key)
+                {
+                    case Key.A:
+                        selectionStart = 0;
+                        selectionEnd = text.Length;
+                        cursorAndLayout.Invalidate();
+                        return true;
+                    case Key.C:
+                        if (string.IsNullOrEmpty(SelectedText) || !AllowClipboardExport) return true;
+
+                        clipboard?.SetText(SelectedText);
+                        return true;
+                    case Key.X:
+                        if (string.IsNullOrEmpty(SelectedText) || !AllowClipboardExport) return true;
+
+                        clipboard?.SetText(SelectedText);
+                        removeCharacterOrSelection();
+                        return true;
+                    case Key.V:
+
+                        //the text may get pasted into the hidden textbox, so we don't need any direct clipboard interaction here.
+                        string pending = textInput?.GetPendingText();
+
+                        if (string.IsNullOrEmpty(pending))
+                            pending = clipboard?.GetText();
+
+                        insertString(pending);
+                        return true;
+                }
+
+                return false;
+            }
+
+            if (state.Keyboard.AltPressed)
+                return false;
 
             switch (args.Key)
             {
@@ -579,42 +627,6 @@ namespace osu.Framework.Graphics.UserInterface
 
                     removeCharacterOrSelection();
                     return true;
-            }
-
-            if (state.Keyboard.ControlPressed)
-            {
-                //handling of function keys
-                switch (args.Key)
-                {
-                    case Key.A:
-                        selectionStart = 0;
-                        selectionEnd = text.Length;
-                        cursorAndLayout.Invalidate();
-                        return true;
-                    case Key.C:
-                        if (string.IsNullOrEmpty(SelectedText) || !AllowClipboardExport) return true;
-
-                        clipboard?.SetText(SelectedText);
-                        return true;
-                    case Key.X:
-                        if (string.IsNullOrEmpty(SelectedText) || !AllowClipboardExport) return true;
-
-                        clipboard?.SetText(SelectedText);
-                        removeCharacterOrSelection();
-                        return true;
-                    case Key.V:
-
-                        //the text may get pasted into the hidden textbox, so we don't need any direct clipboard interaction here.
-                        string pending = textInput?.GetPendingText();
-
-                        if (string.IsNullOrEmpty(pending))
-                            pending = clipboard?.GetText();
-
-                        insertString(pending);
-                        return true;
-                }
-
-                return false;
             }
 
             return true;
@@ -738,7 +750,7 @@ namespace osu.Framework.Graphics.UserInterface
             Caret.ClearTransforms();
             Caret.FadeOut(200);
 
-            if (state.Keyboard.Keys.Contains(Key.Enter))
+            if (!Current.Disabled && state.Keyboard.Keys.Contains(Key.Enter))
             {
                 Background.Colour = BackgroundUnfocused;
                 Background.ClearTransforms();

@@ -6,6 +6,7 @@ using System.Linq;
 using osu.Framework.Configuration;
 using osu.Framework.Logging;
 using OpenTK;
+using OpenTK.Graphics;
 using OpenTK.Graphics.ES30;
 
 namespace osu.Framework.Platform
@@ -16,7 +17,7 @@ namespace osu.Framework.Platform
         internal Version GLSLVersion;
 
         protected GameWindow(int width, int height)
-            : base(width, height)
+            : base(width, height, new GraphicsMode(GraphicsMode.Default.ColorFormat, GraphicsMode.Default.Depth, GraphicsMode.Default.Stencil, GraphicsMode.Default.Samples, GraphicsMode.Default.AccumulatorFormat, 3))
         {
             Closing += (sender, e) => e.Cancel = ExitRequested?.Invoke() ?? false;
             Closed += (sender, e) => Exited?.Invoke();
@@ -58,7 +59,7 @@ namespace osu.Framework.Platform
             Context.MakeCurrent(null);
         }
 
-        private CursorState cursorState = CursorState.Visible;
+        private CursorState cursorState = CursorState.Default;
 
         /// <summary>
         /// Controls the state of the OS cursor.
@@ -71,13 +72,16 @@ namespace osu.Framework.Platform
                 cursorState = value;
                 switch (cursorState)
                 {
-                    case CursorState.Visible:
+                    case CursorState.Default:
                         base.CursorVisible = true;
                         base.Cursor = MouseCursor.Default;
                         break;
                     case CursorState.Hidden:
                         base.CursorVisible = true;
                         base.Cursor = MouseCursor.Empty;
+                        break;
+                    case CursorState.Confined:
+                        //TODO: support this (https://github.com/ppy/osu-framework/issues/686)
                         break;
                     case CursorState.HiddenAndConfined:
                         base.CursorVisible = false;
@@ -142,22 +146,28 @@ namespace osu.Framework.Platform
     /// <summary>
     /// Describes our supported states of the OS cursor.
     /// </summary>
+    [Flags]
     public enum CursorState
     {
         /// <summary>
         /// The OS cursor is always visible and can move anywhere.
         /// </summary>
-        Visible,
+        Default = 0,
 
         /// <summary>
         /// The OS cursor is hidden while hovering the <see cref="GameWindow"/>, but can still move anywhere.
         /// </summary>
-        Hidden,
+        Hidden = 1,
+
+        /// <summary>
+        /// The OS cursor is confined to the <see cref="GameWindow"/> while the window is in focus.
+        /// </summary>
+        Confined = 2,
 
         /// <summary>
         /// The OS cursor is hidden while hovering the <see cref="GameWindow"/>.
         /// It is confined to the <see cref="GameWindow"/> while the window is in focus and can move freely otherwise.
         /// </summary>
-        HiddenAndConfined,
+        HiddenAndConfined = Hidden | Confined,
     }
 }
