@@ -64,6 +64,7 @@ namespace osu.Framework
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
+                    AlwaysReceiveInput = true,
                 },
                 new GlobalHotkeys
                 {
@@ -100,6 +101,8 @@ namespace osu.Framework
         {
             Host = host;
             host.Exiting += OnExiting;
+            host.Activated += () => IsActive = true;
+            host.Deactivated += () => IsActive = false;
         }
 
         [BackgroundDependencyLoader]
