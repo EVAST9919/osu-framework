@@ -118,6 +118,8 @@
     <Compile Include="Graphics\Containers\IHasFilterTerms.cs" />
     <Compile Include="Graphics\Containers\SearchContainer.cs" />
     <Compile Include="Graphics\Containers\TabbableContainer.cs" />
+    <Compile Include="Graphics\Cursor\IHasTooltip.cs" />
+    <Compile Include="Graphics\Cursor\TooltipContainer.cs" />
     <Compile Include="Graphics\UserInterface\BasicCheckbox.cs" />
     <Compile Include="Graphics\UserInterface\Checkbox.cs" />
     <Compile Include="Graphics\UserInterface\IHasCurrentValue.cs" />
@@ -127,6 +129,7 @@
     <Compile Include="Graphics\UserInterface\TabControl.cs" />
     <Compile Include="Graphics\UserInterface\TabItem.cs" />
     <Compile Include="Input\GlobalHotkeys.cs" />
+    <Compile Include="Input\Handlers\IHasCursorSensitivity.cs" />
     <Compile Include="Input\KeyUpEventArgs.cs" />
     <Compile Include="Allocation\TimedExpiryCache.cs" />
     <Compile Include="Input\IRequireHighFrequencyMousePosition.cs" />
@@ -324,7 +327,7 @@
     <Compile Include="Allocation\BackgroundDependencyLoader.cs" />
     <Compile Include="Configuration\BindableNumber.cs" />
     <Compile Include="Graphics\UserInterface\CircularProgressDrawNode.cs" />
-    <Compile Include="Graphics\Sprites\Paragraph.cs" />
+    <Compile Include="Graphics\Containers\TextFlowContainer.cs" />
     <Compile Include="Graphics\UserInterface\CircularProgress.cs" />
   </ItemGroup>
   <ItemGroup>
