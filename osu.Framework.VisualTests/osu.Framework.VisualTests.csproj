@@ -54,8 +54,10 @@
     <Compile Include="Tests\TestCaseCheckboxes.cs" />
     <Compile Include="Tests\TestCaseCircularProgress.cs" />
     <Compile Include="Tests\TestCaseColourGradient.cs" />
+    <Compile Include="Tests\TestCaseContextMenu.cs" />
     <Compile Include="Tests\TestCaseCoordinateSpaces.cs" />
     <Compile Include="Tests\TestCaseDrawablePath.cs" />
+    <Compile Include="Tests\TestCaseEffects.cs" />
     <Compile Include="Tests\TestCaseFillModes.cs" />
     <Compile Include="Tests\TestCaseFlow.cs" />
     <Compile Include="Tests\TestCaseHollowEdgeEffect.cs" />
@@ -80,6 +82,7 @@
     <Compile Include="Tests\TestCaseNestedHover.cs" />
     <Compile Include="Tests\TestCaseTooltip.cs" />
     <Compile Include="Tests\TestCaseTriangles.cs" />
+    <Compile Include="Tests\TestCaseVertexBindBenchmark.cs" />
     <Compile Include="VisualTestGame.cs" />
     <None Include="..\osu-framework.licenseheader">
       <Link>osu-framework.licenseheader</Link>
