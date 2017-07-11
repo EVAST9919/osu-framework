@@ -1,23 +1,24 @@
 ﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
 
-using System;
-using System.Diagnostics;
+using OpenTK;
+using OpenTK.Graphics;
+using OpenTK.Input;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.OpenGL.Textures;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input;
+using osu.Framework.MathUtils;
 using osu.Framework.Statistics;
-using OpenTK;
-using OpenTK.Graphics;
-using OpenTK.Input;
-using System.Linq;
-using System.Collections.Generic;
 using osu.Framework.Threading;
-using osu.Framework.Graphics.Primitives;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 
 namespace osu.Framework.Graphics.Performance
 {
@@ -32,7 +33,7 @@ namespace osu.Framework.Graphics.Performance
         private const float visible_ms_range = 20;
         private const float scale = HEIGHT / visible_ms_range;
 
-        private const float alpha_when_inactive = 0.75f;
+        private const float alpha_when_active = 0.75f;
 
         private readonly TimeBar[] timeBars;
         private readonly BufferStack<byte> textureBufferStack;
@@ -54,7 +55,7 @@ namespace osu.Framework.Graphics.Performance
         private readonly Container mainContainer;
         private readonly Container timeBarsContainer;
 
-        private readonly Drawable[] legendMapping = new Drawable[(int)PerformanceCollectionType.AmountTypes];
+        private readonly Drawable[] legendMapping = new Drawable[FrameStatistics.NUM_PERFORMANCE_COLLECTION_TYPES];
         private readonly Dictionary<StatisticsCounterType, CounterBar> counterBars = new Dictionary<StatisticsCounterType, CounterBar>();
 
         private readonly FpsDisplay fpsDisplay;
@@ -103,13 +104,9 @@ namespace osu.Framework.Graphics.Performance
 
             Origin = Anchor.TopRight;
             AutoSizeAxes = Axes.Both;
-            Alpha = alpha_when_inactive;
+            Alpha = alpha_when_active;
 
-            bool hasCounters = false;
-            for (int i = 0; i < (int)StatisticsCounterType.AmountTypes; ++i)
-                if (monitor.Counters[i] != null)
-                    hasCounters = true;
-
+            bool hasCounters = monitor.ActiveCounters.Any(b => b);
             Child = new Container
             {
                 AutoSizeAxes = Axes.Both,
@@ -153,7 +150,7 @@ namespace osu.Framework.Graphics.Performance
                                             RelativeSizeAxes = Axes.Y,
                                             ChildrenEnumerable =
                                                 from StatisticsCounterType t in Enum.GetValues(typeof(StatisticsCounterType))
-                                                where t < StatisticsCounterType.AmountTypes && monitor.Counters[(int)t] != null
+                                                where monitor.ActiveCounters[(int)t]
                                                 select counterBars[t] = new CounterBar
                                                 {
                                                     Colour = getColour(t),
@@ -200,7 +197,6 @@ namespace osu.Framework.Graphics.Performance
                                         Padding = new MarginPadding { Right = 5 },
                                         ChildrenEnumerable =
                                             from PerformanceCollectionType t in Enum.GetValues(typeof(PerformanceCollectionType))
-                                            where t < PerformanceCollectionType.AmountTypes
                                             select legendMapping[(int)t] = new SpriteText
                                             {
                                                 Colour = getColour(t),
@@ -237,13 +233,13 @@ namespace osu.Framework.Graphics.Performance
             byte[] column = new byte[HEIGHT * 4];
             byte[] fullBackground = new byte[WIDTH * HEIGHT * 4];
 
-            addArea(null, PerformanceCollectionType.AmountTypes, HEIGHT, column, amount_ms_steps);
+            addArea(null, null, HEIGHT, column, amount_ms_steps);
 
             for (int i = 0; i < HEIGHT; i++)
-            for (int k = 0; k < WIDTH; k++)
-                Buffer.BlockCopy(column, i * 4, fullBackground, i * WIDTH * 4 + k * 4, 4);
+                for (int k = 0; k < WIDTH; k++)
+                    Buffer.BlockCopy(column, i * 4, fullBackground, i * WIDTH * 4 + k * 4, 4);
 
-            addArea(null, PerformanceCollectionType.AmountTypes, HEIGHT, column, amount_count_steps);
+            addArea(null, null, HEIGHT, column, amount_count_steps);
 
             counterBarBackground?.Texture.SetData(new TextureUpload(column));
             Schedule(() =>
@@ -278,26 +274,12 @@ namespace osu.Framework.Graphics.Performance
 
                 active = value || state != FrameStatisticsMode.Full;
 
-                if (active)
-                {
-                    overlayContainer.FadeOut(100);
-                    FadeTo(alpha_when_inactive, 100);
-                    fpsDisplay.Counting = true;
-                    processFrames = true;
-
-                    foreach (CounterBar bar in counterBars.Values)
-                        bar.Active = true;
-                }
-                else
-                {
-                    overlayContainer.FadeIn(100);
-                    FadeIn(100);
-                    fpsDisplay.Counting = false;
-                    processFrames = false;
-
-                    foreach (CounterBar bar in counterBars.Values)
-                        bar.Active = false;
-                }
+                overlayContainer.FadeTo(active ? 0 : 1, 100);
+                FadeTo(active ? alpha_when_active : 1, 100);
+                fpsDisplay.Counting = active;
+                processFrames = active;
+                foreach (CounterBar bar in counterBars.Values)
+                    bar.Active = active;
             }
         }
 
@@ -331,8 +313,9 @@ namespace osu.Framework.Graphics.Performance
 
             int currentHeight = HEIGHT;
 
-            for (int i = 0; i <= (int)PerformanceCollectionType.AmountTypes; i++)
+            for (int i = 0; i < FrameStatistics.NUM_PERFORMANCE_COLLECTION_TYPES; i++)
                 currentHeight = addArea(frame, (PerformanceCollectionType)i, currentHeight, upload.Data, amount_ms_steps);
+            addArea(frame, null, currentHeight, upload.Data, amount_ms_steps);
 
             timeBar.Sprite.Texture.SetData(upload);
 
@@ -396,8 +379,6 @@ namespace osu.Framework.Graphics.Performance
                     return Color4.GhostWhite;
                 case PerformanceCollectionType.GLReset:
                     return Color4.Cyan;
-                case PerformanceCollectionType.AmountTypes:
-                    return new Color4(0.1f, 0.1f, 0.1f, 1);
             }
         }
 
@@ -434,22 +415,22 @@ namespace osu.Framework.Graphics.Performance
                     return Color4.Red;
 
                 case StatisticsCounterType.ScheduleInvk:
-                case StatisticsCounterType.KiloPixels:
+                case StatisticsCounterType.Pixels:
                 case StatisticsCounterType.Components:
                     return Color4.Cyan;
             }
         }
 
-        private int addArea(FrameStatistics frame, PerformanceCollectionType frameTimeType, int currentHeight, byte[] textureData, int amountSteps)
+        private int addArea(FrameStatistics frame, PerformanceCollectionType? frameTimeType, int currentHeight, byte[] textureData, int amountSteps)
         {
             Trace.Assert(textureData.Length >= HEIGHT * 4, $"textureData is too small ({textureData.Length}) to hold area data.");
 
             double elapsedMilliseconds;
             int drawHeight;
 
-            if (frameTimeType == PerformanceCollectionType.AmountTypes)
+            if (!frameTimeType.HasValue)
                 drawHeight = currentHeight;
-            else if (frame.CollectedTimes.TryGetValue(frameTimeType, out elapsedMilliseconds))
+            else if (frame.CollectedTimes.TryGetValue(frameTimeType.Value, out elapsedMilliseconds))
             {
                 legendMapping[(int)frameTimeType].Alpha = 1;
                 drawHeight = (int)(elapsedMilliseconds * scale);
@@ -457,7 +438,7 @@ namespace osu.Framework.Graphics.Performance
             else
                 return currentHeight;
 
-            Color4 col = getColour(frameTimeType);
+            Color4 col = frameTimeType.HasValue ? getColour(frameTimeType.Value) : new Color4(0.1f, 0.1f, 0.1f, 1);
 
             for (int i = currentHeight - 1; i >= 0; --i)
             {
@@ -466,7 +447,7 @@ namespace osu.Framework.Graphics.Performance
                 bool acceptableRange = (float)currentHeight / HEIGHT > 1 - monitor.FrameAimTime / visible_ms_range;
 
                 float brightnessAdjust = 1;
-                if (frameTimeType == PerformanceCollectionType.AmountTypes)
+                if (!frameTimeType.HasValue)
                 {
                     int step = amountSteps / HEIGHT;
                     brightnessAdjust *= 1 - i * step / 8f;
@@ -529,7 +510,7 @@ namespace osu.Framework.Graphics.Performance
                     {
                         ResizeTo(new Vector2(bar_width + text.TextSize + 2, 1), 100);
                         text.FadeIn(100);
-                        text.Text = $@"{Label}: {(long)Math.Round(Math.Pow(10, box.Height * amount_count_steps) - 1)}";
+                        text.Text = $@"{Label}: {NumberFormatter.PrintWithSiSuffix(this.value)}";
                     }
                 }
             }
@@ -538,6 +519,16 @@ namespace osu.Framework.Graphics.Performance
             private double velocity;
             private const double acceleration = 0.000001;
             private const float bar_width = 6;
+
+            private long value;
+            public long Value
+            {
+                set
+                {
+                    this.value = value;
+                    height = Math.Log10(value + 1) / amount_count_steps;
+                }
+            }
 
             public CounterBar()
             {
@@ -566,17 +557,9 @@ namespace osu.Framework.Graphics.Performance
                 Active = true;
             }
 
-            public long Value
-            {
-                set { height = Math.Log10(value + 1) / amount_count_steps; }
-            }
-
             protected override void Update()
             {
                 base.Update();
-
-                if (!Active)
-                    return;
 
                 double elapsedTime = Time.Elapsed;
                 double movement = velocity * Time.Elapsed + 0.5 * acceleration * elapsedTime * elapsedTime;

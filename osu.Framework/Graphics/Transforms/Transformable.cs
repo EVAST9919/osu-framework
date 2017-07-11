@@ -4,6 +4,9 @@
 using System;
 using osu.Framework.Lists;
 using osu.Framework.Timing;
+using System.Linq;
+using osu.Framework.Allocation;
+using System.Collections.Generic;
 
 namespace osu.Framework.Graphics.Transforms
 {
@@ -34,25 +37,11 @@ namespace osu.Framework.Graphics.Transforms
         /// </summary>
         protected double TransformDelay { get; private set; }
 
-        private LifetimeList<ITransform<T>> transforms;
+        private SortedList<ITransform<T>> transforms;
         /// <summary>
         /// A lazily-initialized list of <see cref="ITransform{T}"/>s applied to this class.
         /// </summary>
-        public LifetimeList<ITransform<T>> Transforms
-        {
-            get
-            {
-                if (transforms == null)
-                {
-                    transforms = new LifetimeList<ITransform<T>>(new TransformTimeComparer<T>());
-
-                    // Apply transforms one last time when they're removed
-                    transforms.Removed += t => t.Apply(derivedThis);
-                }
-
-                return transforms;
-            }
-        }
+        public SortedList<ITransform<T>> Transforms => transforms ?? (transforms = new SortedList<ITransform<T>>(new TransformTimeComparer<T>()));
 
         /// <summary>
         /// We will need to pass in the derived version of ourselves in various methods below (including <see cref="ITransform{T}.Apply(T)"/>)
@@ -83,13 +72,46 @@ namespace osu.Framework.Graphics.Transforms
             if (transforms == null || transforms.Count == 0)
                 return;
 
-            transforms.Update(Time);
+            for (int i = 0; i < transforms.Count; ++i)
+            {
+                var t = transforms[i];
 
-            // We iterate by index to gain performance
-            var aliveTransforms = transforms.AliveItems;
-            // ReSharper disable once ForCanBeConvertedToForeach
-            for (int i = 0; i < aliveTransforms.Count; ++i)
-                aliveTransforms[i].Apply(derivedThis);
+                if (t.StartTime > Time.Current)
+                    break;
+
+                if (!t.Time.HasValue)
+                {
+                    // this is the first time we are updating this transform with a valid time.
+                    t.ReadIntoStartValue(derivedThis);
+
+                    var ourType = t.GetType();
+
+                    for (int j = 0; j < i; j++)
+                    {
+                        if (transforms[j].GetType() == ourType)
+                        {
+                            transforms.RemoveAt(j--);
+                            i--;
+                        }
+                    }
+                }
+
+                t.UpdateTime(Time);
+                t.Apply(derivedThis);
+
+                if (t.EndTime <= Time.Current)
+                {
+                    transforms.RemoveAt(i--);
+                    if (t.HasNextIteration)
+                    {
+                        t.NextIteration();
+
+                        // this could be added back at a lower index than where we are currently iterating, but
+                        // running the same transform twice isn't a huge deal.
+                        transforms.Add(t);
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -133,18 +155,11 @@ namespace osu.Framework.Graphics.Transforms
         /// <param name="flushType">An optional type of transform to flush. Null for all types.</param>
         public virtual void Flush(bool propagateChildren = false, Type flushType = null)
         {
-            var operateTransforms = flushType == null ? Transforms : Transforms.FindAll(t => t.GetType() == flushType);
-
-            double maxTime = double.MinValue;
-            foreach (ITransform<T> t in operateTransforms)
-                if (t.EndTime > maxTime)
-                    maxTime = t.EndTime;
-
-            FrameTimeInfo maxTimeInfo = new FrameTimeInfo { Current = maxTime };
+            var operateTransforms = flushType == null ? Transforms : Transforms.Where(t => t.GetType() == flushType);
 
             foreach (ITransform<T> t in operateTransforms)
             {
-                t.UpdateTime(maxTimeInfo);
+                t.UpdateTime(new FrameTimeInfo { Current = t.EndTime });
                 t.Apply(derivedThis);
             }
 
@@ -159,30 +174,58 @@ namespace osu.Framework.Graphics.Transforms
         /// </summary>
         /// <param name="delay">The offset in milliseconds from current time. Note that this stacks with other nested sequences.</param>
         /// <param name="recursive">Whether this should be applied to all children.</param>
-        /// <returns>A <see cref="TransformSequence" /> to be used in a using() statement.</returns>
-        public TransformSequence BeginDelayedSequence(double delay, bool recursive = false) => new TransformSequence(this, delay, recursive);
+        /// <returns>A <see cref="InvokeOnDisposal"/> to be used in a using() statement.</returns>
+        public InvokeOnDisposal BeginDelayedSequence(double delay, bool recursive = false)
+        {
+            Delay(delay, recursive);
+
+            return new InvokeOnDisposal(() => Delay(-delay, recursive));
+        }
 
         /// <summary>
         /// Start a sequence of transforms from an absolute time value.
         /// </summary>
         /// <param name="startOffset">The offset in milliseconds from absolute zero.</param>
         /// <param name="recursive">Whether this should be applied to all children.</param>
-        /// <returns>A <see cref="TransformSequence" /> to be used in a using() statement.</returns>
+        /// <returns>A <see cref="InvokeOnDisposal"/> to be used in a using() statement.</returns>
         /// <exception cref="InvalidOperationException">Absolute sequences should never be nested inside another existing sequence.</exception>
-        public TransformSequence BeginAbsoluteSequence(double startOffset = 0, bool recursive = false)
+        public InvokeOnDisposal BeginAbsoluteSequence(double startOffset = 0, bool recursive = false)
         {
             if (TransformDelay != 0) throw new InvalidOperationException($"Cannot use {nameof(BeginAbsoluteSequence)} with a non-zero transform delay already present");
-            return new TransformSequence(this, -(Clock?.CurrentTime ?? 0) + startOffset, recursive);
+            return BeginDelayedSequence(-(Clock?.CurrentTime ?? 0) + startOffset, recursive);
         }
 
+        private bool isInLoopedSequence;
+
         /// <summary>
-        /// Set the loop interval of all transformations contained in <see cref="Transforms"/>.
+        /// Loop all transforms created within a using block of this sequence.
         /// </summary>
-        /// <param name="delay">The loop interval to set, in milliseconds.</param>
-        public void Loop(float delay = 0)
+        /// <param name="pause">The time to pause between loop iterations. 0 by default.</param>
+        /// <param name="numIterations">The amount of loop iterations to perform. A negative value results in looping indefinitely. -1 by default.</param>
+        public InvokeOnDisposal BeginLoopedSequence(double pause = 0, int numIterations = -1)
         {
-            foreach (var t in Transforms)
-                t.Loop(Math.Max(0, TransformDelay + delay - t.Duration));
+            if (isInLoopedSequence)
+                throw new InvalidOperationException($"May not nest multiple {nameof(BeginLoopedSequence)}s.");
+            isInLoopedSequence = true;
+
+            if (pause < 0)
+                throw new InvalidOperationException($"May not call {nameof(BeginLoopedSequence)} with a negative {nameof(pause)}, but was {pause}.");
+
+            // We do not want to loop those
+            HashSet<ITransform<T>> existingTransforms = new HashSet<ITransform<T>>(Transforms);
+
+            return new InvokeOnDisposal(delegate
+            {
+                var newTransforms = Transforms.Except(existingTransforms).ToArray();
+                isInLoopedSequence = false;
+
+                if (newTransforms.Length == 0)
+                    return;
+
+                double duration = newTransforms.Max(t => t.EndTime) - newTransforms.Min(t => t.StartTime);
+                foreach (var t in Transforms.Except(existingTransforms))
+                    t.Loop(pause + duration - t.Duration, numIterations);
+            });
         }
 
         /// <summary>
@@ -205,48 +248,24 @@ namespace osu.Framework.Graphics.Transforms
         /// Applies a transform to this object.
         /// </summary>
         /// <typeparam name="TValue">The value type upon which the transform acts.</typeparam>
-        /// <param name="currentValue">A function to get the current value to transform from.</param>
         /// <param name="newValue">The value to transform to.</param>
         /// <param name="duration">The transform duration.</param>
         /// <param name="easing">The transform easing.</param>
         /// <param name="transform">The transform to use.</param>
-        public void TransformTo<TValue>(Func<TValue> currentValue, TValue newValue, double duration, EasingTypes easing, Transform<TValue, T> transform) where TValue : struct, IEquatable<TValue>
+        public void TransformTo<TValue>(TValue newValue, double duration, EasingTypes easing, Transform<TValue, T> transform) where TValue : struct, IEquatable<TValue>
         {
-            Type type = transform.GetType();
+            //if (duration == 0 && TransformDelay == 0)
+            //{
+            //    // we can apply transforms instantly under certain conditions.
+            //    transform.UpdateTime(new FrameTimeInfo { Current = transform.EndTime });
+            //    transform.Apply(derivedThis);
+            //    return;
+            //}
 
             double startTime = TransformStartTime;
 
-            //For simplicity let's just update *all* transforms.
-            //The commented (more optimised code) below doesn't consider past "removed" transforms, which can cause discrepancies.
-            updateTransforms();
-
-            //foreach (ITransform t in Transforms.AliveItems)
-            //    if (t.GetType() == type)
-            //        t.Apply(this);
-
-            TValue startValue = currentValue();
-
-            if (TransformDelay == 0)
-            {
-                Transforms.RemoveAll(t => t.GetType() == type);
-
-                if (startValue.Equals(newValue))
-                    return;
-            }
-            else
-            {
-                var last = Transforms.FindLast(t => t.GetType() == type) as Transform<TValue, T>;
-                if (last != null)
-                {
-                    //we may be in the middle of an existing transform, so let's update it to the start time of our new transform.
-                    last.UpdateTime(new FrameTimeInfo { Current = startTime });
-                    startValue = last.CurrentValue;
-                }
-            }
-
             transform.StartTime = startTime;
             transform.EndTime = startTime + duration;
-            transform.StartValue = startValue;
             transform.EndValue = newValue;
             transform.Easing = easing;
 
@@ -255,6 +274,9 @@ namespace osu.Framework.Graphics.Transforms
 
         private void addTransform(ITransform<T> transform)
         {
+            if (transform == null)
+                throw new ArgumentNullException(nameof(transform));
+
             if (Clock == null)
             {
                 transform.UpdateTime(new FrameTimeInfo { Current = transform.EndTime });
@@ -262,62 +284,12 @@ namespace osu.Framework.Graphics.Transforms
                 return;
             }
 
-            //we have no duration and do not need to be delayed, so we can just apply ourselves and be gone.
-            bool canApplyInstant = transform.Duration == 0 && TransformDelay == 0;
-
-            //we should also immediately apply any transforms that have already started to avoid potentially applying them one frame too late.
-            if (canApplyInstant || transform.StartTime < Time.Current)
-            {
-                transform.UpdateTime(Time);
-                transform.Apply(derivedThis);
-                if (canApplyInstant)
-                    return;
-            }
-
             Transforms.Add(transform);
-        }
 
-        /// <summary>
-        /// A disposable-pattern object to handle isolated sequences of transforms. Should only be used in using blocks.
-        /// </summary>
-        public class TransformSequence : IDisposable
-        {
-            private readonly Transformable<T> us;
-            private readonly bool recursive;
-            private readonly double adjust;
-
-            public TransformSequence(Transformable<T> us, double adjust, bool recursive = false)
-            {
-                this.recursive = recursive;
-                this.us = us;
-                this.adjust = adjust;
-
-                us.Delay(adjust, recursive);
-            }
-
-            #region IDisposable Support
-            private bool disposed;
-
-            protected virtual void Dispose(bool disposing)
-            {
-                if (!disposed)
-                {
-                    us.Delay(-adjust, recursive);
-                    disposed = true;
-                }
-            }
-
-            ~TransformSequence()
-            {
-                Dispose(false);
-            }
-
-            public void Dispose()
-            {
-                Dispose(true);
-                GC.SuppressFinalize(this);
-            }
-            #endregion
+            // If our newly added transform could have an immediate effect, then let's
+            // make this effect happen immediately.
+            if (transform.StartTime < Time.Current || transform.EndTime <= Time.Current)
+                updateTransforms();
         }
     }
 }
