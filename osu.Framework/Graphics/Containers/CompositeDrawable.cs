@@ -19,6 +19,7 @@ using osu.Framework.Caching;
 using osu.Framework.MathUtils;
 using osu.Framework.Threading;
 using osu.Framework.Statistics;
+using System.Threading.Tasks;
 
 namespace osu.Framework.Graphics.Containers
 {
@@ -37,18 +38,38 @@ namespace osu.Framework.Graphics.Containers
         /// Contructs a <see cref="CompositeDrawable"/> that stores its children in a given <see cref="LifetimeList{T}"/>.
         /// If null is provides, then a new <see cref="LifetimeList{T}"/> is automatically created.
         /// </summary>
-        protected CompositeDrawable(LifetimeList<Drawable> lifetimeList = null)
+        protected CompositeDrawable()
         {
-            internalChildren = lifetimeList ?? new LifetimeList<Drawable>(DepthComparer);
+            internalChildren = new LifetimeList<Drawable>(new ChildComparer(this));
             internalChildren.Removed += obj =>
             {
                 if (obj.DisposeOnDeathRemoval) obj.Dispose();
             };
         }
 
-        [BackgroundDependencyLoader(true)]
-        private void load(ShaderManager shaders)
+        private Game game;
+
+        /// <summary>
+        /// Loads a future child or grand-child of this <see cref="CompositeDrawable"/> asyncronously. <see cref="Drawable.Dependencies"/>
+        /// and <see cref="Drawable.Clock"/> are inherited from this <see cref="CompositeDrawable"/>.
+        /// </summary>
+        /// <typeparam name="TLoadable">The type of the future future child or grand-child to be loaded.</typeparam>
+        /// <param name="component">The type of the future future child or grand-child to be loaded.</param>
+        /// <param name="onLoaded">Callback to be invoked on the update thread after loading is complete.</param>
+        /// <returns>The task which is used for loading and callbacks.</returns>
+        protected Task LoadComponentAsync<TLoadable>(TLoadable component, Action<TLoadable> onLoaded = null) where TLoadable : Drawable
         {
+            if (game == null)
+                throw new InvalidOperationException($"May not invoke {nameof(LoadComponentAsync)} prior to this {nameof(CompositeDrawable)} being loaded.");
+
+            return component.LoadAsync(game, this, () => onLoaded?.Invoke(component));
+        }
+
+        [BackgroundDependencyLoader(true)]
+        private void load(Game game, ShaderManager shaders)
+        {
+            this.game = game;
+
             if (shader == null)
                 shader = shaders?.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE_ROUNDED);
 
@@ -112,6 +133,50 @@ namespace osu.Framework.Graphics.Containers
             }
         }
 
+        private class ChildComparer : IComparer<Drawable>
+        {
+            private readonly CompositeDrawable owner;
+
+            public ChildComparer(CompositeDrawable owner)
+            {
+                this.owner = owner;
+            }
+
+            public int Compare(Drawable x, Drawable y) => owner.Compare(x, y);
+        }
+
+        /// <summary>
+        /// Compares two <see cref="InternalChildren"/> to determine their sorting.
+        /// </summary>
+        /// <param name="x">The first child to compare.</param>
+        /// <param name="y">The second child to compare.</param>
+        /// <returns>-1 if <paramref name="x"/> comes before <paramref name="y"/>, and 1 otherwise.</returns>
+        protected virtual int Compare(Drawable x, Drawable y)
+        {
+            if (x == null) throw new ArgumentNullException(nameof(x));
+            if (y == null) throw new ArgumentNullException(nameof(y));
+
+            int i = y.Depth.CompareTo(x.Depth);
+            if (i != 0) return i;
+            return x.ChildID.CompareTo(y.ChildID);
+        }
+
+        /// <summary>
+        /// Helper method comparing children by their depth first, and then by their reversed child ID.
+        /// </summary>
+        /// <param name="x">The first child to compare.</param>
+        /// <param name="y">The second child to compare.</param>
+        /// <returns>-1 if <paramref name="x"/> comes before <paramref name="y"/>, and 1 otherwise.</returns>
+        protected int CompareReverseChildID(Drawable x, Drawable y)
+        {
+            if (x == null) throw new ArgumentNullException(nameof(x));
+            if (y == null) throw new ArgumentNullException(nameof(y));
+
+            int i = y.Depth.CompareTo(x.Depth);
+            if (i != 0) return i;
+            return y.ChildID.CompareTo(x.ChildID);
+        }
+
         private readonly LifetimeList<Drawable> internalChildren;
 
         /// <summary>
@@ -132,7 +197,7 @@ namespace osu.Framework.Graphics.Containers
             set
             {
                 ClearInternal();
-                AddInternal(value);
+                AddRangeInternal(value);
             }
         }
 
@@ -155,13 +220,15 @@ namespace osu.Framework.Graphics.Containers
         /// <summary>
         /// Removes a given child from this <see cref="InternalChildren"/>.
         /// </summary>
-        protected internal void RemoveInternal(Drawable drawable)
+        /// <param name="drawable">The <see cref="Drawable"/> to be removed.</param>
+        /// <returns>False if <paramref name="drawable"/> was not a child of this <see cref="CompositeDrawable"/> and true otherwise.</returns>
+        protected internal bool RemoveInternal(Drawable drawable)
         {
             if (drawable == null)
                 throw new ArgumentNullException(nameof(drawable));
 
             if (!internalChildren.Remove(drawable))
-                throw new InvalidOperationException($@"Cannot remove a drawable ({drawable}) which is not a child of this ({this}), but {drawable.Parent}.");
+                return false;
 
             if (drawable.IsLoaded)
             {
@@ -173,6 +240,8 @@ namespace osu.Framework.Graphics.Containers
 
             if (AutoSizeAxes != Axes.None)
                 InvalidateFromChild(Invalidation.RequiredParentSizeToFit);
+
+            return true;
         }
 
         /// <summary>
@@ -207,6 +276,12 @@ namespace osu.Framework.Graphics.Containers
         }
 
         /// <summary>
+        /// Used to assign a monotonically increasing ID to children as they are added. This member is
+        /// incremented whenever a child is added.
+        /// </summary>
+        private ulong currentChildID;
+
+        /// <summary>
         /// Adds a child to <see cref="InternalChildren"/>.
         /// </summary>
         protected internal virtual void AddInternal(Drawable drawable)
@@ -220,8 +295,8 @@ namespace osu.Framework.Graphics.Containers
             if (drawable.IsLoaded)
                 drawable.Parent = this;
 
+            drawable.ChildID = ++currentChildID;
             internalChildren.Add(drawable);
-            drawable.IsPartOfComposite = true;
 
             if (AutoSizeAxes != Axes.None)
                 InvalidateFromChild(Invalidation.RequiredParentSizeToFit);
@@ -231,7 +306,7 @@ namespace osu.Framework.Graphics.Containers
         /// Adds a range of children to <see cref="InternalChildren"/>. This is equivalent to calling
         /// <see cref="AddInternal(Drawable)"/> on each element of the range in order.
         /// </summary>
-        protected internal void AddInternal(IEnumerable<Drawable> range)
+        protected internal void AddRangeInternal(IEnumerable<Drawable> range)
         {
             foreach (Drawable d in range)
                 AddInternal(d);
@@ -258,7 +333,7 @@ namespace osu.Framework.Graphics.Containers
 
         private Scheduler schedulerAfterChildren;
 
-        protected Scheduler SchedulerAfterChildren => schedulerAfterChildren ?? (schedulerAfterChildren = new Scheduler(MainThread));
+        protected Scheduler SchedulerAfterChildren => schedulerAfterChildren ?? (schedulerAfterChildren = new Scheduler(MainThread, Clock));
 
         /// <summary>
         /// Updates the life status of <see cref="InternalChildren"/> according to their
@@ -276,7 +351,7 @@ namespace osu.Framework.Graphics.Containers
             return false;
         }
 
-        public sealed override void UpdateClock(IFrameBasedClock clock)
+        public override void UpdateClock(IFrameBasedClock clock)
         {
             if (Clock == clock)
                 return;
@@ -284,6 +359,8 @@ namespace osu.Framework.Graphics.Containers
             base.UpdateClock(clock);
             foreach (Drawable child in internalChildren)
                 child.UpdateClock(Clock);
+
+            schedulerAfterChildren?.UpdateClock(Clock);
         }
 
         /// <summary>
@@ -809,7 +886,6 @@ namespace osu.Framework.Graphics.Containers
                 if (padding.Equals(value)) return;
 
                 padding = value;
-                padding.ThrowIfNegative();
 
                 foreach (Drawable c in internalChildren)
                     c.Invalidate(c.InvalidationFromParentSize);

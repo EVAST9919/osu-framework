@@ -53,14 +53,14 @@ namespace osu.Framework.VisualTests.Tests
 
             for (int i = 0; i < Rows * Cols; ++i)
             {
-                Cell(i).Add(new Drawable[]
+                Cell(i).AddRange(new Drawable[]
                 {
                     new SpriteText
                     {
                         Text = $"{nameof(CornerRadius)}={cornerRadii[i]} {nameof(Alpha)}={alphas[i]}",
                         TextSize = 20,
                     },
-                    new Container()
+                    new Container
                     {
                         Size = new Vector2(size),
                         Anchor = Anchor.Centre,
@@ -72,7 +72,7 @@ namespace osu.Framework.VisualTests.Tests
 
                         Children = new Drawable[]
                         {
-                            new Box()
+                            new Box
                             {
                                 RelativeSizeAxes = Axes.Both,
                                 Colour = Color4.Aqua,

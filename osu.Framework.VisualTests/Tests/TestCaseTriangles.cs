@@ -19,7 +19,7 @@ namespace osu.Framework.VisualTests.Tests
 
         public TestCaseTriangles()
         {
-            Add(testContainer = new Container()
+            Add(testContainer = new Container
             {
                 RelativeSizeAxes = Axes.Both,
             });
@@ -90,7 +90,7 @@ namespace osu.Framework.VisualTests.Tests
 
                     addCornerMarkers(box);
 
-                    box.Add(new[]
+                    box.AddRange(new[]
                     {
                         new DraggableTriangle
                         {

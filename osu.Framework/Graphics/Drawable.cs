@@ -43,11 +43,6 @@ namespace osu.Framework.Graphics
     {
         #region Construction and disposal
 
-        protected Drawable()
-        {
-            creationID = creation_counter.Increment();
-        }
-
         ~Drawable()
         {
             dispose(false);
@@ -130,23 +125,19 @@ namespace osu.Framework.Graphics
         /// The target this Drawable may eventually be loaded into.
         /// <see cref="Clock"/> and <see cref="Dependencies"/> are inherited from the target.
         /// </param>
-        /// <param name="onLoaded">Callback to be invoked asynchronously after loading is complete.</param>
+        /// <param name="onLoaded">Callback to be invoked on the update thread after loading is complete.</param>
         /// <returns>The task which is used for loading and callbacks.</returns>
-        internal Task LoadAsync<T>(Game game, Drawable target, Action<T> onLoaded = null)
-            where T : Drawable
+        internal Task LoadAsync(Game game, Drawable target, Action onLoaded = null)
         {
             if (loadState != LoadState.NotLoaded)
                 throw new InvalidOperationException($@"{nameof(LoadAsync)} may not be called more than once on the same Drawable.");
-
-            if (!(this is T))
-                throw new InvalidOperationException($"The {nameof(T)} parameter of the {nameof(LoadAsync)} must be a subtype of {GetType().ReadableName()}.");
 
             loadState = LoadState.Loading;
 
             return loadTask = Task.Run(() => Load(target.Clock, target.Dependencies)).ContinueWith(task => game.Schedule(() =>
             {
                 task.ThrowIfFaulted();
-                onLoaded?.Invoke((T)this);
+                onLoaded?.Invoke();
                 loadTask = null;
             }));
         }
@@ -237,14 +228,12 @@ namespace osu.Framework.Graphics
         #region Sorting (CreationID / Depth)
 
         /// <summary>
-        /// Captures the order in which Drawables were created. Each Drawable
-        /// is assigned a unique, monotonically increasing ID upon creation in a thread-safe manner.
-        /// The primary use case of this ID is stable sorting of Drawables with equal
-        /// <see cref="Depth"/>.
+        /// Captures the order in which Drawables were added to a <see cref="CompositeDrawable"/>. Each Drawable
+        /// is assigned a monotonically increasing ID upon being added to a <see cref="CompositeDrawable"/>. This
+        /// ID is unique within the <see cref="Parent"/> <see cref="CompositeDrawable"/>.
+        /// The primary use case of this ID is stable sorting of Drawables with equal <see cref="Depth"/>.
         /// </summary>
-        private long creationID { get; }
-
-        private static readonly AtomicCounter creation_counter = new AtomicCounter();
+        public ulong ChildID { get; internal set; }
 
         /// <summary>
         /// Whether this drawable has been added to a parent <see cref="CompositeDrawable"/>. Note that this does NOT imply that
@@ -252,7 +241,7 @@ namespace osu.Framework.Graphics
         /// This is primarily used to block properties such as <see cref="Depth"/> that strictly rely on the value of <see cref="Parent"/>
         /// to alert the user of an invalid operation.
         /// </summary>
-        internal bool IsPartOfComposite;
+        internal bool IsPartOfComposite => ChildID != 0;
 
         private float depth;
 
@@ -268,39 +257,13 @@ namespace osu.Framework.Graphics
             set
             {
                 if (IsPartOfComposite)
-                    throw new InvalidOperationException($"May not change {nameof(Depth)} while inside a parent container. Use the parent's {nameof(Container.ChangeChildDepth)} instead.");
+                    throw new InvalidOperationException(
+                        $"May not change {nameof(Depth)} while inside a parent {nameof(CompositeDrawable)}." +
+                        $"Use the parent's {nameof(CompositeDrawable.ChangeInternalChildDepth)} or {nameof(Container.ChangeChildDepth)} instead.");
 
                 depth = value;
             }
         }
-
-        public class CreationOrderDepthComparer : IComparer<Drawable>
-        {
-            public virtual int Compare(Drawable x, Drawable y)
-            {
-                if (x == null) throw new ArgumentNullException(nameof(x));
-                if (y == null) throw new ArgumentNullException(nameof(y));
-
-                int i = y.Depth.CompareTo(x.Depth);
-                if (i != 0) return i;
-                return x.creationID.CompareTo(y.creationID);
-            }
-        }
-
-        public class ReverseCreationOrderDepthComparer : IComparer<Drawable>
-        {
-            public virtual int Compare(Drawable x, Drawable y)
-            {
-                if (x == null) throw new ArgumentNullException(nameof(x));
-                if (y == null) throw new ArgumentNullException(nameof(y));
-
-                int i = y.Depth.CompareTo(x.Depth);
-                if (i != 0) return i;
-                return y.creationID.CompareTo(x.creationID);
-            }
-        }
-
-        protected virtual IComparer<Drawable> DepthComparer => new CreationOrderDepthComparer();
 
         #endregion
 
@@ -333,7 +296,7 @@ namespace osu.Framework.Graphics
         /// A lazily-initialized scheduler used to schedule tasks to be invoked in future <see cref="Update"/>s calls.
         /// The tasks are invoked at the beginning of the <see cref="Update"/> method before anything else.
         /// </summary>
-        protected Scheduler Scheduler => scheduler ?? (scheduler = new Scheduler(MainThread));
+        protected Scheduler Scheduler => scheduler ?? (scheduler = new Scheduler(MainThread, Clock));
 
         /// <summary>
         /// Updates this Drawable and all Drawables further down the scene graph.
@@ -646,7 +609,6 @@ namespace osu.Framework.Graphics
                 if (margin.Equals(value)) return;
 
                 margin = value;
-                margin.ThrowIfNegative();
 
                 Invalidate(Invalidation.MiscGeometry);
             }
@@ -1179,6 +1141,7 @@ namespace osu.Framework.Graphics
         public virtual void UpdateClock(IFrameBasedClock clock)
         {
             this.clock = customClock ?? clock;
+            scheduler?.UpdateClock(this.clock);
         }
 
         /// <summary>
@@ -1238,7 +1201,8 @@ namespace osu.Framework.Graphics
                 if (isDisposed)
                     throw new ObjectDisposedException(ToString(), "Disposed Drawables may never get a parent and return to the scene graph.");
 
-                IsPartOfComposite = value != null;
+                if (value == null)
+                    ChildID = 0;
 
                 if (parent == value) return;
 
@@ -2285,7 +2249,7 @@ namespace osu.Framework.Graphics
         NotLoaded,
         /// <summary>
         /// Currently loading (possibly and usually on a background
-        /// thread via <see cref="Drawable.LoadAsync{T}(Game, Drawable, Action{T})"/>).
+        /// thread via <see cref="Drawable.LoadAsync(Game, Drawable, Action)"/>).
         /// </summary>
         Loading,
         /// <summary>

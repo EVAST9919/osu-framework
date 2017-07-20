@@ -94,6 +94,7 @@
     <Compile Include="Configuration\FrameSync.cs" />
     <Compile Include="Configuration\FrameworkConfigManager.cs" />
     <Compile Include="Configuration\FrameworkDebugConfig.cs" />
+    <Compile Include="Configuration\NonNullableBindable.cs" />
     <Compile Include="Configuration\WindowMode.cs" />
     <Compile Include="Extensions\Color4Extensions\Color4Extensions.cs" />
     <Compile Include="Extensions\PolygonExtensions\ConvexPolygonExtensions.cs" />
@@ -148,6 +149,7 @@
     <Compile Include="Graphics\OpenGL\Vertices\TimedTexturedVertex2D.cs" />
     <Compile Include="Graphics\OpenGL\Vertices\UncolouredVertex2D.cs" />
     <Compile Include="Graphics\OpenGL\Vertices\Vertex2D.cs" />
+    <Compile Include="Graphics\Textures\TextureWhitePixel.cs" />
     <Compile Include="Graphics\UserInterface\BasicCheckbox.cs" />
     <Compile Include="Graphics\UserInterface\Checkbox.cs" />
     <Compile Include="Graphics\UserInterface\ContextMenu.cs" />

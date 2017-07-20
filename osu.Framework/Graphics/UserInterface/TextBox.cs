@@ -18,6 +18,7 @@ using osu.Framework.Audio;
 using osu.Framework.Configuration;
 using osu.Framework.Platform;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Timing;
 
 namespace osu.Framework.Graphics.UserInterface
 {
@@ -71,7 +72,7 @@ namespace osu.Framework.Graphics.UserInterface
             Masking = true;
             CornerRadius = 3;
 
-            Add(new Drawable[]
+            AddRange(new Drawable[]
             {
                 Background = new Box
                 {
@@ -132,6 +133,18 @@ namespace osu.Framework.Graphics.UserInterface
                     cursorAndLayout.Invalidate();
                 };
             }
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            textUpdateScheduler.SetCurrentThread(MainThread);
+        }
+
+        public override void UpdateClock(IFrameBasedClock clock)
+        {
+            base.UpdateClock(clock);
+            textUpdateScheduler.UpdateClock(Clock);
         }
 
         private void resetSelection()
@@ -335,7 +348,7 @@ namespace osu.Framework.Graphics.UserInterface
             List<Drawable> charsRight = new List<Drawable>();
             foreach (Drawable d in TextFlow.Children.Skip(selectionLeft))
                 charsRight.Add(d);
-            TextFlow.Remove(charsRight);
+            TextFlow.RemoveRange(charsRight);
 
             // Update their depth to make room for the to-be inserted character.
             int i = -selectionLeft;
@@ -349,7 +362,7 @@ namespace osu.Framework.Graphics.UserInterface
             TextFlow.Add(ch);
 
             // Add back all the previously removed characters
-            TextFlow.Add(charsRight);
+            TextFlow.AddRange(charsRight);
 
             return ch;
         }
