@@ -5,6 +5,7 @@ using osu.Framework.Lists;
 using System.Collections.Generic;
 using System;
 using System.Diagnostics;
+using System.Threading;
 using OpenTK;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.OpenGL;
@@ -276,7 +277,7 @@ namespace osu.Framework.Graphics.Containers
         /// Used to assign a monotonically increasing ID to children as they are added. This member is
         /// incremented whenever a child is added.
         /// </summary>
-        private ulong currentChildID;
+        private static long currentChildID;
 
         /// <summary>
         /// Adds a child to <see cref="InternalChildren"/>.
@@ -293,12 +294,12 @@ namespace osu.Framework.Graphics.Containers
             if (drawable.ChildID != 0)
                 throw new InvalidOperationException("May not add a drawable to multiple containers.");
 
-            drawable.ChildID = ++currentChildID;
+            drawable.ChildID = Interlocked.Increment(ref currentChildID);
 
             if (drawable.LoadState >= LoadState.Ready)
                 drawable.Parent = this;
             // If we're already loaded, we can eagerly allow children to be loaded
-            else if (LoadState >= LoadState.Ready)
+            else if (LoadState >= LoadState.Loading)
                 loadChild(drawable);
 
             internalChildren.Add(drawable);
@@ -350,8 +351,11 @@ namespace osu.Framework.Graphics.Containers
         {
             bool anyAliveChanged = false;
 
-            for (int i = internalChildren.Count - 1; i >= 0; i--)
-                anyAliveChanged |= checkChildLife(internalChildren[i]);
+            // checkChildLife may remove a child from internalChildren. In order to not skip children,
+            // we keep track of the original amount children to apply an offset to the iterator
+            int originalCount = internalChildren.Count;
+            for (int i = 0; i < internalChildren.Count; i++)
+                anyAliveChanged |= checkChildLife(internalChildren[i + internalChildren.Count - originalCount]);
 
             if (anyAliveChanged)
                 childrenSizeDependencies.Invalidate();
