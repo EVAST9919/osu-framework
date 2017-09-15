@@ -155,7 +155,7 @@ namespace osu.Framework.Graphics
 
         /// <summary>
         /// Contains all dependencies that can be injected into this Drawable using <see cref="BackgroundDependencyLoader"/>.
-        /// Add or override dependencies by calling <see cref="DependencyContainer.Cache{T}(T, bool, bool)"/>.
+        /// Add or override dependencies by calling <see cref="DependencyContainer.Cache{T}(T, bool)"/>.
         /// </summary>
         public IReadOnlyDependencyContainer Dependencies { get; private set; }
 
@@ -167,8 +167,13 @@ namespace osu.Framework.Graphics
         internal void Load(IFrameBasedClock clock, IReadOnlyDependencyContainer dependencies)
         {
             // Blocks when loading from another thread already.
+            double t0 = perf.CurrentTime;
             lock (loadLock)
             {
+                double lockDuration = perf.CurrentTime - t0;
+                if (perf.CurrentTime > 1000 && lockDuration > 50 && ThreadSafety.IsUpdateThread)
+                    Logger.Log($@"Drawable [{ToString()}] load was blocked for {lockDuration:0.00}ms!", LoggingTarget.Performance);
+
                 switch (loadState)
                 {
                     case LoadState.Ready:
@@ -193,9 +198,9 @@ namespace osu.Framework.Graphics
 
                 Dependencies.Inject(this);
 
-                double elapsed = perf.CurrentTime - t1;
-                if (perf.CurrentTime > 1000 && elapsed > 50 && ThreadSafety.IsUpdateThread)
-                    Logger.Log($@"Drawable [{ToString()}] took {elapsed:0.00}ms to load and was not async!", LoggingTarget.Performance);
+                double loadDuration = perf.CurrentTime - t1;
+                if (perf.CurrentTime > 1000 && loadDuration > 50 && ThreadSafety.IsUpdateThread)
+                    Logger.Log($@"Drawable [{ToString()}] took {loadDuration:0.00}ms to load and was not async!", LoggingTarget.Performance);
                 loadState = LoadState.Ready;
             }
         }
@@ -1093,25 +1098,25 @@ namespace osu.Framework.Graphics
             }
         }
 
-        private BlendingMode blendingMode;
+        private BlendingParameters blending;
 
         /// <summary>
         /// Determines how this Drawable is blended with other already drawn Drawables.
-        /// Inherits the <see cref="Parent"/>'s <see cref="BlendingMode"/> by default.
+        /// Inherits the <see cref="Parent"/>'s <see cref="Blending"/> by default.
         /// </summary>
-        public BlendingMode BlendingMode
+        public BlendingParameters Blending
         {
-            get { return blendingMode; }
+            get { return blending; }
 
             set
             {
-                if (blendingMode == value) return;
+                if (blending.Equals(value))
+                    return;
 
-                blendingMode = value;
+                blending = value;
                 Invalidate(Invalidation.Colour);
             }
         }
-
         #endregion
 
         #region Timekeeping
@@ -1287,18 +1292,24 @@ namespace osu.Framework.Graphics
 
             Vector2 pos = DrawPosition + AnchorPosition;
             Vector2 drawScale = DrawScale;
-            BlendingMode localBlendingMode = BlendingMode;
+            BlendingParameters localBlending = Blending;
 
             if (Parent != null)
             {
                 pos += Parent.ChildOffset;
 
-                if (localBlendingMode == BlendingMode.Inherit)
-                    localBlendingMode = Parent.BlendingMode;
+                if (localBlending.Mode == BlendingMode.Inherit)
+                    localBlending.Mode = Parent.Blending.Mode;
+
+                if (localBlending.RGBEquation == BlendingEquation.Inherit)
+                    localBlending.RGBEquation = Parent.Blending.RGBEquation;
+
+                if (localBlending.AlphaEquation == BlendingEquation.Inherit)
+                    localBlending.AlphaEquation = Parent.Blending.AlphaEquation;
             }
 
             di.ApplyTransform(pos, drawScale, Rotation, Shear, OriginPosition);
-            di.Blending = new BlendingInfo(localBlendingMode);
+            di.Blending = new BlendingInfo(localBlending);
 
             ColourInfo drawInfoColour = alpha != 1 ? colour.MultiplyAlpha(alpha) : colour;
 
@@ -1494,7 +1505,7 @@ namespace osu.Framework.Graphics
             if (other == this)
                 return input;
 
-            return input * DrawInfo.Matrix * other.DrawInfo.MatrixInverse;
+            return Vector2Extensions.Transform(Vector2Extensions.Transform(input, DrawInfo.Matrix), other.DrawInfo.MatrixInverse);
         }
 
         /// <summary>
@@ -1532,7 +1543,7 @@ namespace osu.Framework.Graphics
         /// <returns>The vector in screen coordinates.</returns>
         public Vector2 ToScreenSpace(Vector2 input)
         {
-            return input * DrawInfo.Matrix;
+            return Vector2Extensions.Transform(input, DrawInfo.Matrix);
         }
 
         /// <summary>
@@ -1552,7 +1563,7 @@ namespace osu.Framework.Graphics
         /// <returns>The vector in local coordinates.</returns>
         public Vector2 ToLocalSpace(Vector2 screenSpacePos)
         {
-            return screenSpacePos * DrawInfo.MatrixInverse;
+            return Vector2Extensions.Transform(screenSpacePos, DrawInfo.MatrixInverse);
         }
 
         /// <summary>
@@ -2121,26 +2132,6 @@ namespace osu.Framework.Graphics
     {
         Clockwise,
         CounterClockwise,
-    }
-
-    public enum BlendingMode
-    {
-        /// <summary>
-        /// Inherits from parent.
-        /// </summary>
-        Inherit = 0,
-        /// <summary>
-        /// Mixes with existing colour by a factor of the colour's alpha.
-        /// </summary>
-        Mixture,
-        /// <summary>
-        /// Purely additive (by a factor of the colour's alpha) blending.
-        /// </summary>
-        Additive,
-        /// <summary>
-        /// No alpha blending whatsoever.
-        /// </summary>
-        None,
     }
 
     /// <summary>

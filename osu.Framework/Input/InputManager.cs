@@ -138,10 +138,13 @@ namespace osu.Framework.Input
         /// <summary>
         /// Reset current focused drawable to the top-most drawable which is <see cref="Drawable.RequestsFocus"/>.
         /// </summary>
-        public void TriggerFocusContention()
+        /// <param name="triggerSource">The source which triggered this event.</param>
+        public void TriggerFocusContention(Drawable triggerSource)
         {
-            if (FocusedDrawable != this)
-                ChangeFocus(null);
+            if (FocusedDrawable == null) return;
+
+            Logger.Log($"Focus contention triggered by {triggerSource}.");
+            ChangeFocus(null);
         }
 
         /// <summary>
@@ -184,6 +187,8 @@ namespace osu.Framework.Input
             }
 
             FocusedDrawable = potentialFocusTarget;
+
+            Logger.Log($"Focus switched to {FocusedDrawable?.ToString() ?? "nothing"}.", LoggingTarget.Runtime, LogLevel.Debug);
 
             if (FocusedDrawable != null)
             {
@@ -541,7 +546,7 @@ namespace osu.Framework.Input
                     }
                 }
 
-                if (!isDragging && Vector2.Distance(mouse.PositionMouseDown ?? mouse.Position, mouse.Position) > drag_start_distance)
+                if (!isDragging && Vector2Extensions.Distance(mouse.PositionMouseDown ?? mouse.Position, mouse.Position) > drag_start_distance)
                 {
                     isDragging = true;
                     handleMouseDragStart(state);
@@ -549,7 +554,7 @@ namespace osu.Framework.Input
             }
             else if (last.HasAnyButtonPressed)
             {
-                if (isValidClick && (DraggedDrawable == null || Vector2.Distance(mouse.PositionMouseDown ?? mouse.Position, mouse.Position) < click_drag_distance))
+                if (isValidClick && (DraggedDrawable == null || Vector2Extensions.Distance(mouse.PositionMouseDown ?? mouse.Position, mouse.Position) < click_drag_distance))
                     handleMouseClick(state);
 
                 mouseDownInputQueue = null;
