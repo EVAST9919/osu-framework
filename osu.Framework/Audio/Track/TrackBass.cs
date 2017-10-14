@@ -3,7 +3,6 @@
 
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading;
 using ManagedBass;
 using ManagedBass.Fx;
@@ -54,7 +53,7 @@ namespace osu.Framework.Audio.Track
 
                 var procs = new DataStreamFileProcedures(dataStream);
 
-                BassFlags flags = Preview ? 0 : BassFlags.Decode | BassFlags.Prescan;
+                BassFlags flags = Preview ? 0 : BassFlags.Decode | BassFlags.Prescan | BassFlags.Float;
                 activeStream = Bass.CreateStream(StreamSystem.NoBuffer, flags, procs.BassProcedures, IntPtr.Zero);
 
                 if (!Preview)
@@ -101,15 +100,24 @@ namespace osu.Framework.Audio.Track
             double currentTimeLocal = Bass.ChannelBytes2Seconds(activeStream, Bass.ChannelGetPosition(activeStream)) * 1000;
             Interlocked.Exchange(ref currentTime, currentTimeLocal == Length && !isPlayed ? 0 : currentTimeLocal);
 
-            //As reported in https://github.com/ManagedBass/ManagedBass/issues/32, ManagedBass returns -32768 when it should return 32768, the following lines prevent having invalid values
-            float tempLevel = Bass.ChannelGetLevelLeft(activeStream) / 32768f;
-            currentAmplitudes.LeftChannel = tempLevel == -1 ? 1 : tempLevel;
-            tempLevel = Bass.ChannelGetLevelRight(activeStream) / 32768f;
-            currentAmplitudes.RightChannel = tempLevel == -1 ? 1 : tempLevel;
+            var leftChannel = isPlayed ? Bass.ChannelGetLevelLeft(activeStream) / 32768f : -1;
+            var rightChannel = isPlayed ? Bass.ChannelGetLevelRight(activeStream) / 32768f : -1;
 
-            float[] tempFrequencyData = new float[256];
-            Bass.ChannelGetData(activeStream, tempFrequencyData, (int)DataFlags.FFT512);
-            currentAmplitudes.FrequencyAmplitudes = tempFrequencyData;
+            if (leftChannel >= 0 && rightChannel >= 0)
+            {
+                currentAmplitudes.LeftChannel = leftChannel;
+                currentAmplitudes.RightChannel = rightChannel;
+
+                float[] tempFrequencyData = new float[256];
+                Bass.ChannelGetData(activeStream, tempFrequencyData, (int)DataFlags.FFT512);
+                currentAmplitudes.FrequencyAmplitudes = tempFrequencyData;
+            }
+            else
+            {
+                currentAmplitudes.LeftChannel = 0;
+                currentAmplitudes.RightChannel = 0;
+                currentAmplitudes.FrequencyAmplitudes = new float[256];
+            }
 
             base.Update();
         }
@@ -176,6 +184,8 @@ namespace osu.Framework.Audio.Track
             });
         }
 
+        private Action seekAction;
+
         public override bool Seek(double seek)
         {
             // At this point the track may not yet be loaded which is indicated by a 0 length.
@@ -183,8 +193,13 @@ namespace osu.Framework.Audio.Track
             double conservativeLength = Length == 0 ? double.MaxValue : Length;
             double conservativeClamped = MathHelper.Clamp(seek, 0, conservativeLength);
 
-            PendingActions.Enqueue(() =>
+            Action action = null;
+
+            action = () =>
             {
+                // we only want to run the most fresh seek event, else we may fall behind (seeks can be relatively expensive).
+                if (action != seekAction) return;
+
                 double clamped = MathHelper.Clamp(seek, 0, Length);
 
                 if (clamped != CurrentTime)
@@ -192,7 +207,10 @@ namespace osu.Framework.Audio.Track
                     long pos = Bass.ChannelSeconds2Bytes(activeStream, clamped / 1000d);
                     Bass.ChannelSetPosition(activeStream, pos);
                 }
-            });
+            };
+
+            seekAction = action;
+            PendingActions.Enqueue(action);
 
             return conservativeClamped == seek;
         }
@@ -226,83 +244,6 @@ namespace osu.Framework.Audio.Track
         public override int? Bitrate => bitrate;
 
         public override bool HasCompleted => base.HasCompleted || IsLoaded && !IsRunning && CurrentTime >= Length;
-
-        private class DataStreamFileProcedures
-        {
-            private byte[] readBuffer = new byte[32768];
-
-            private readonly AsyncBufferStream dataStream;
-
-            public FileProcedures BassProcedures => new FileProcedures
-            {
-                Close = ac_Close,
-                Length = ac_Length,
-                Read = ac_Read,
-                Seek = ac_Seek
-            };
-
-            public DataStreamFileProcedures(AsyncBufferStream data)
-            {
-                dataStream = data;
-            }
-
-            private void ac_Close(IntPtr user)
-            {
-                //manually handle closing of stream
-            }
-
-            private long ac_Length(IntPtr user)
-            {
-                if (dataStream == null) return 0;
-
-                try
-                {
-                    return dataStream.Length;
-                }
-                catch
-                {
-                }
-
-                return 0;
-            }
-
-            private int ac_Read(IntPtr buffer, int length, IntPtr user)
-            {
-                if (dataStream == null) return 0;
-
-                try
-                {
-                    if (length > readBuffer.Length)
-                        readBuffer = new byte[length];
-
-                    if (!dataStream.CanRead)
-                        return 0;
-
-                    int readBytes = dataStream.Read(readBuffer, 0, length);
-                    Marshal.Copy(readBuffer, 0, buffer, readBytes);
-                    return readBytes;
-                }
-                catch
-                {
-                }
-
-                return 0;
-            }
-
-            private bool ac_Seek(long offset, IntPtr user)
-            {
-                if (dataStream == null) return false;
-
-                try
-                {
-                    return dataStream.Seek(offset, SeekOrigin.Begin) == offset;
-                }
-                catch
-                {
-                }
-                return false;
-            }
-        }
 
         public double PitchAdjust
         {
