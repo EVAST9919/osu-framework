@@ -41,7 +41,11 @@ namespace osu.Framework.Testing
 
         private readonly BasicDropdown<Assembly> assemblyDropdown;
 
-        public TestBrowser()
+        /// <summary>
+        /// Creates a new TestBrowser that displays the TestCases of every assembly that start with either "osu" or the specified namespace (if it isn't null)
+        /// </summary>
+        /// <param name="assemblyNamespace">Assembly prefix which is used to match assemblies whose tests should be displayed</param>
+        public TestBrowser(string assemblyNamespace = null)
         {
             assemblyDropdown = new BasicDropdown<Assembly>
             {
@@ -51,14 +55,14 @@ namespace osu.Framework.Testing
             assemblyDropdown.Current.ValueChanged += updateList;
 
             var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies().ToList();
-            var loadedPaths = loadedAssemblies.Select(a => a.Location).ToArray();
+            var loadedPaths = loadedAssemblies.Where(a => !a.IsDynamic).Select(a => a.Location).ToArray();
 
             var referencedPaths = Directory.GetFiles(AppDomain.CurrentDomain.BaseDirectory, "*Test*.dll");
             var toLoad = referencedPaths.Where(r => !loadedPaths.Contains(r, StringComparer.InvariantCultureIgnoreCase)).ToList();
             toLoad.ForEach(path => loadedAssemblies.Add(AppDomain.CurrentDomain.Load(AssemblyName.GetAssemblyName(path))));
 
             //we want to build the lists here because we're interested in the assembly we were *created* on.
-            foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies().Where(n => n.FullName.StartsWith("osu")))
+            foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies().Where(n => n.FullName.StartsWith("osu") || assemblyNamespace != null && n.FullName.StartsWith(assemblyNamespace)))
             {
                 var tests = asm.GetLoadableTypes().Where(t => t.IsSubclassOf(typeof(TestCase)) && !t.IsAbstract).ToList();
 
@@ -276,10 +280,10 @@ namespace osu.Framework.Testing
 
             if (testType != null)
             {
-                assemblyDropdown.RemoveDropdownItem(assemblyDropdown.Items.LastOrDefault(i => i.Value.CodeBase.Contains("DotNetCompiler")).Value);
+                assemblyDropdown.RemoveDropdownItem(assemblyDropdown.Items.LastOrDefault(i => i.Value.FullName.Contains("DotNetCompiler")).Value);
 
                 // if we are a dynamically compiled type (via DynamicClassCompiler) we should update the dropdown accordingly.
-                if (testType.Assembly.CodeBase.Contains("DotNetCompiler"))
+                if (testType.Assembly.FullName.Contains("DotNetCompiler"))
                     assemblyDropdown.AddDropdownItem($"dynamic ({testType.Name})", testType.Assembly);
 
                 assemblyDropdown.Current.Value = testType.Assembly;

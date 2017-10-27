@@ -26,6 +26,7 @@ using osu.Framework.Logging;
 using osu.Framework.Statistics;
 using osu.Framework.Threading;
 using osu.Framework.Timing;
+using osu.Framework.IO.File;
 
 namespace osu.Framework.Platform
 {
@@ -78,7 +79,9 @@ namespace osu.Framework.Platform
 
         public virtual Clipboard GetClipboard() => null;
 
-        public virtual Storage Storage { get; protected set; }
+        protected abstract Storage GetStorage(string baseName);
+
+        public Storage Storage { get; protected set; }
 
         /// <summary>
         /// If capslock is enabled on the system, false if not overwritten by a subclass
@@ -149,7 +152,11 @@ namespace osu.Framework.Platform
 
             AppDomain.CurrentDomain.UnhandledException += exceptionHandler;
 
+            FileSafety.DeleteCleanupDirectory();
+
             Dependencies.Cache(this);
+            Dependencies.Cache(Storage = GetStorage(gameName));
+
             Name = gameName;
             Logger.GameIdentifier = gameName;
 
@@ -553,6 +560,11 @@ namespace osu.Framework.Platform
             isDisposed = true;
             stopAllThreads();
             Root?.Dispose();
+
+            config?.Dispose();
+            debugConfig?.Dispose();
+
+            Logger.WaitForCompletion();
         }
 
         ~GameHost()

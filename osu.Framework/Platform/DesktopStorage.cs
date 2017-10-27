@@ -4,10 +4,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using SQLite.Net;
-using SQLite.Net.Interop;
-using SQLite.Net.Platform.Generic;
-using SQLite.Net.Platform.Win32;
+using osu.Framework.IO.File;
 
 namespace osu.Framework.Platform
 {
@@ -33,20 +30,13 @@ namespace osu.Framework.Platform
                 Directory.Delete(path, true);
         }
 
-        public override void Delete(string path)
-        {
-            path = GetUsablePathFor(path);
-
-            // handles the case where the containing directory doesn't exist, which will throw a DirectoryNotFoundException.
-            if (File.Exists(path))
-                File.Delete(path);
-        }
+        public override void Delete(string path) => FileSafety.FileDelete(GetUsablePathFor(path));
 
         public override string[] GetDirectories(string path) => Directory.GetDirectories(GetUsablePathFor(path));
 
         public override void OpenInNativeExplorer()
         {
-            Process.Start(BasePath);
+            Process.Start(GetUsablePathFor(string.Empty));
         }
 
         public override Stream GetStream(string path, FileAccess access = FileAccess.Read, FileMode mode = FileMode.OpenOrCreate)
@@ -66,14 +56,9 @@ namespace osu.Framework.Platform
             }
         }
 
-        public override SQLiteConnection GetDatabase(string name)
+        public override string GetDatabaseConnectionString(string name)
         {
-            ISQLitePlatform platform;
-            if (RuntimeInfo.IsWindows)
-                platform = new SQLitePlatformWin32(Architecture.NativeIncludePath);
-            else
-                platform = new SQLitePlatformGeneric();
-            return new SQLiteConnection(platform, GetUsablePathFor($@"{name}.db", true));
+            return string.Concat("Data Source=", GetUsablePathFor($@"{name}.db", true));
         }
 
         public override void DeleteDatabase(string name) => Delete($@"{name}.db");
