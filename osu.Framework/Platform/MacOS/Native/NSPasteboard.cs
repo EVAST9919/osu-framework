@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 
@@ -25,7 +25,8 @@ namespace osu.Framework.Platform.MacOS.Native
 
         internal int ClearContents() => Cocoa.SendInt(Handle, sel_clear_contents);
 
-        internal bool CanReadObjectForClasses(NSArray classArray, NSDictionary? optionDict) => Cocoa.SendBool(Handle, sel_can_read_object_for_classes, classArray.Handle, optionDict?.Handle ?? IntPtr.Zero);
+        internal bool CanReadObjectForClasses(NSArray classArray, NSDictionary? optionDict) =>
+            Cocoa.SendBool(Handle, sel_can_read_object_for_classes, classArray.Handle, optionDict?.Handle ?? IntPtr.Zero);
 
         internal NSArray? ReadObjectsForClasses(NSArray classArray, NSDictionary? optionDict)
         {

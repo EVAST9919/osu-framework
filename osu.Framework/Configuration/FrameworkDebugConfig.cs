@@ -1,12 +1,12 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System.Runtime;
 using osu.Framework.Caching;
 
 namespace osu.Framework.Configuration
 {
-    public class FrameworkDebugConfigManager : ConfigManager<DebugSetting>
+    public class FrameworkDebugConfigManager : IniConfigManager<DebugSetting>
     {
         protected override string Filename => null;
 

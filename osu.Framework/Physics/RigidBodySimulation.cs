@@ -1,7 +1,7 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using OpenTK;
+using osuTK;
 using osu.Framework.Graphics;
 using System.Collections.Generic;
 using System;
@@ -78,8 +78,8 @@ namespace osu.Framework.Physics
 
         public override float Mass
         {
-            get { return float.MaxValue; }
-            set { throw new InvalidOperationException($"May not set the {nameof(Mass)} of a {nameof(RigidBodySimulation<T>)}."); }
+            get => float.MaxValue;
+            set => throw new InvalidOperationException($"May not set the {nameof(Mass)} of a {nameof(RigidBodySimulation<T>)}.");
         }
 
         protected override void UpdateVertices()

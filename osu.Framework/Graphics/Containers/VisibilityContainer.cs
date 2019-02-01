@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 
@@ -36,7 +36,7 @@ namespace osu.Framework.Graphics.Containers
 
         public Visibility State
         {
-            get { return state; }
+            get => state;
             set
             {
                 if (value == state) return;
@@ -67,7 +67,8 @@ namespace osu.Framework.Graphics.Containers
 
         public override void Show() => State = Visibility.Visible;
 
-        public override bool HandleInput => State == Visibility.Visible;
+        public override bool PropagateNonPositionalInputSubTree => base.PropagateNonPositionalInputSubTree && State == Visibility.Visible;
+        public override bool PropagatePositionalInputSubTree => base.PropagatePositionalInputSubTree && State == Visibility.Visible;
 
         public event Action<Visibility> StateChanged;
 
@@ -76,5 +77,11 @@ namespace osu.Framework.Graphics.Containers
         protected abstract void PopOut();
 
         public void ToggleVisibility() => State = State == Visibility.Visible ? Visibility.Hidden : Visibility.Visible;
+    }
+
+    public enum Visibility
+    {
+        Hidden,
+        Visible
     }
 }

@@ -1,8 +1,8 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
-using OpenTK;
+using osuTK;
 
 namespace osu.Framework.Graphics.Containers
 {
@@ -14,6 +14,10 @@ namespace osu.Framework.Graphics.Containers
     /// </summary>
     public class DrawSizePreservingFillContainer : Container
     {
+        private readonly Container content;
+
+        protected override Container<Drawable> Content => content;
+
         /// <summary>
         /// The target <see cref="Drawable.DrawSize"/> to be enforced according to <see cref="Strategy"/>.
         /// </summary>
@@ -28,6 +32,11 @@ namespace osu.Framework.Graphics.Containers
 
         public DrawSizePreservingFillContainer()
         {
+            AddInternal(content = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+            });
+
             RelativeSizeAxes = Axes.Both;
         }
 
@@ -40,23 +49,23 @@ namespace osu.Framework.Graphics.Containers
             switch (Strategy)
             {
                 case DrawSizePreservationStrategy.Minimum:
-                    Scale = new Vector2(Math.Min(drawSizeRatio.X, drawSizeRatio.Y));
+                    content.Scale = new Vector2(Math.Min(drawSizeRatio.X, drawSizeRatio.Y));
                     break;
 
                 case DrawSizePreservationStrategy.Maximum:
-                    Scale = new Vector2(Math.Max(drawSizeRatio.X, drawSizeRatio.Y));
+                    content.Scale = new Vector2(Math.Max(drawSizeRatio.X, drawSizeRatio.Y));
                     break;
 
                 case DrawSizePreservationStrategy.Average:
-                    Scale = new Vector2(0.5f * (drawSizeRatio.X + drawSizeRatio.Y));
+                    content.Scale = new Vector2(0.5f * (drawSizeRatio.X + drawSizeRatio.Y));
                     break;
 
                 case DrawSizePreservationStrategy.Separate:
-                    Scale = drawSizeRatio;
+                    content.Scale = drawSizeRatio;
                     break;
             }
 
-            Size = Vector2.Divide(Vector2.One, Scale);
+            content.Size = Vector2.Divide(Vector2.One, content.Scale);
         }
     }
 

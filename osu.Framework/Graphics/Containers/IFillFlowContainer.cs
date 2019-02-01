@@ -1,11 +1,12 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using OpenTK;
+using osu.Framework.Graphics.Transforms;
+using osuTK;
 
 namespace osu.Framework.Graphics.Containers
 {
-    public interface IFillFlowContainer : IContainer
+    public interface IFillFlowContainer : ITransformable
     {
         Vector2 Spacing { get; set; }
     }

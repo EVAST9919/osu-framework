@@ -1,8 +1,8 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics.Sprites;
-using OpenTK.Graphics;
+using osuTK.Graphics;
 
 namespace osu.Framework.Graphics.UserInterface
 {
@@ -23,8 +23,8 @@ namespace osu.Framework.Graphics.UserInterface
 
             protected internal override string Label
             {
-                get { return label.Text; }
-                set { label.Text = value; }
+                get => label.Text;
+                set => label.Text = value;
             }
 
             public BasicDropdownHeader()

@@ -1,13 +1,16 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using OpenTK;
-using OpenTK.Graphics;
+using osuTK;
+using osuTK.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Transforms;
 using System;
 using System.Linq;
+using JetBrains.Annotations;
+using osu.Framework.Configuration;
+using osu.Framework.MathUtils;
 
 namespace osu.Framework.Graphics
 {
@@ -407,5 +410,13 @@ namespace osu.Framework.Graphics
             where T : IContainer =>
             container.TransformTo(nameof(container.EdgeEffect), newParameters, duration, easing);
 
+        /// <summary>
+        /// Smoothly adjusts the value of a <see cref="Bindable{TValue}"/> over time.
+        /// </summary>
+        /// <returns>A <see cref="TransformSequence{T}"/> to which further transforms can be added.</returns>
+        public static TransformSequence<T> TransformBindableTo<T, TValue>(this T drawable, [NotNull] Bindable<TValue> bindable, TValue newValue, double duration = 0, Easing easing = Easing.None,
+                                                                          InterpolationFunc<TValue> interpolationFunc = null)
+            where T : ITransformable =>
+            drawable.TransformTo(drawable.PopulateTransform(new TransformBindable<TValue, T>(bindable, interpolationFunc), newValue, duration, easing));
     }
 }

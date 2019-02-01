@@ -1,8 +1,9 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using osu.Framework.Platform.Windows.Native;
+using osuTK;
 
 namespace osu.Framework.Platform.Windows
 {
@@ -12,12 +13,12 @@ namespace osu.Framework.Platform.Windows
 
         public override Clipboard GetClipboard() => new WindowsClipboard();
 
-        protected override Storage GetStorage(string baseName) => new WindowsStorage(baseName);
+        protected override Storage GetStorage(string baseName) => new WindowsStorage(baseName, this);
 
         public override bool CapsLockEnabled => Console.CapsLock;
 
-        internal WindowsGameHost(string gameName, bool bindIPC = false)
-            : base(gameName, bindIPC)
+        internal WindowsGameHost(string gameName, bool bindIPC = false, ToolkitOptions toolkitOptions = default)
+            : base(gameName, bindIPC, toolkitOptions)
         {
             // OnActivate / OnDeactivate may not fire, so the initial activity state may be unknown here.
             // In order to be certain we have the correct activity state we are querying the Windows API here.
@@ -25,17 +26,21 @@ namespace osu.Framework.Platform.Windows
             timePeriod = new TimePeriod(1) { Active = true };
 
             Window = new WindowsGameWindow();
-            Window.WindowStateChanged += (sender, e) =>
-            {
-                if (Window.WindowState != OpenTK.WindowState.Minimized)
-                    OnActivated();
-                else
-                    OnDeactivated();
-            };
+            Window.WindowStateChanged += onWindowOnWindowStateChanged;
+        }
+
+        private void onWindowOnWindowStateChanged(object sender, EventArgs e)
+        {
+            if (Window.WindowState != WindowState.Minimized)
+                OnActivated();
+            else
+                OnDeactivated();
         }
 
         protected override void Dispose(bool isDisposing)
         {
+            Window.WindowStateChanged -= onWindowOnWindowStateChanged;
+
             timePeriod?.Dispose();
             base.Dispose(isDisposing);
         }

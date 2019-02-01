@@ -1,7 +1,8 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Timing;
+using osuTK;
 
 namespace osu.Framework.Audio.Track
 {
@@ -21,10 +22,16 @@ namespace osu.Framework.Audio.Track
             double current = CurrentTime;
 
             seekOffset = seek;
-            lock (clock) clock.Restart();
 
-            if (Length > 0 && seekOffset > Length)
-                seekOffset = Length;
+            lock (clock)
+            {
+                if (IsRunning)
+                    clock.Restart();
+                else
+                    clock.Reset();
+            }
+
+            seekOffset = MathHelper.Clamp(seekOffset, 0, Length);
 
             return current != seekOffset;
         }
@@ -55,14 +62,6 @@ namespace osu.Framework.Audio.Track
             }
         }
 
-        public override bool HasCompleted
-        {
-            get
-            {
-                lock (clock) return base.HasCompleted || IsLoaded && !IsRunning && CurrentTime >= Length;
-            }
-        }
-
         public override double CurrentTime
         {
             get
@@ -80,6 +79,14 @@ namespace osu.Framework.Audio.Track
                 if (CurrentTime >= Length)
                     Stop();
             }
+        }
+
+        internal override void OnStateChanged()
+        {
+            base.OnStateChanged();
+
+            lock (clock)
+                clock.Rate = Tempo;
         }
     }
 }

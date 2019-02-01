@@ -1,24 +1,20 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
-using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Input;
+using osu.Framework.Input.Events;
 using osu.Framework.Testing;
-using OpenTK;
-using OpenTK.Graphics;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCaseMasking : TestCase
+    public class TestCaseMasking : TestCase
     {
-        public override string Description => @"Various scenarios which potentially challenge masking calculations.";
-
         protected Container TestContainer;
 
         public TestCaseMasking()
@@ -36,7 +32,8 @@ namespace osu.Framework.Tests.Visual
                 @"Round corner AABB 3",
                 @"Edge/border blurriness",
                 @"Nested masking",
-                @"Rounded corner input"
+                @"Rounded corner input",
+                @"Offset shadow",
             };
 
             for (int i = 0; i < testNames.Length; i++)
@@ -437,6 +434,39 @@ namespace osu.Framework.Tests.Visual
                         });
                         break;
                     }
+
+                case 7:
+                    {
+                        Container box;
+                        TestContainer.Add(box = new InfofulBoxAutoSize
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            Masking = true,
+                            CornerRadius = 100,
+                            Alpha = 0.8f,
+                            EdgeEffect = new EdgeEffectParameters
+                            {
+                                Type = EdgeEffectType.Shadow,
+                                Offset = new Vector2(0, 50),
+                                Hollow = true,
+                                Radius = 50,
+                                Roundness = 50,
+                                Colour = new Color4(0, 255, 255, 255),
+                            },
+                        });
+
+                        box.Add(box = new InfofulBox
+                        {
+                            Size = new Vector2(250, 250),
+                            Origin = Anchor.Centre,
+                            Anchor = Anchor.Centre,
+                            Colour = Color4.DarkSeaGreen,
+                        });
+
+                        box.OnUpdate += delegate { box.Rotation += 0.05f; };
+                        break;
+                    }
             }
 
 #if DEBUG
@@ -447,13 +477,13 @@ namespace osu.Framework.Tests.Visual
 
         private class CircularContainerWithInput : CircularContainer
         {
-            protected override bool OnHover(InputState state)
+            protected override bool OnHover(HoverEvent e)
             {
                 this.ScaleTo(1.2f, 100);
                 return true;
             }
 
-            protected override void OnHoverLost(InputState state)
+            protected override void OnHoverLost(HoverLostEvent e)
             {
                 this.ScaleTo(1f, 100);
             }

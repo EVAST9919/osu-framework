@@ -1,13 +1,14 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
-using OpenTK;
+using System.Globalization;
 
 namespace osu.Framework.Configuration
 {
-    public abstract class BindableNumber<T> : Bindable<T> where T : struct
+    public abstract class BindableNumber<T> : Bindable<T>, IBindableNumber<T>
+        where T : struct, IComparable, IConvertible
     {
         static BindableNumber()
         {
@@ -31,22 +32,88 @@ namespace osu.Framework.Configuration
                     $"{nameof(BindableNumber<T>)} only accepts the primitive numeric types (except for {typeof(decimal).FullName}) as type arguments. You provided {typeof(T).FullName}.");
         }
 
-        protected BindableNumber(T value = default(T))
+        public event Action<T> PrecisionChanged;
+
+        public event Action<T> MinValueChanged;
+
+        public event Action<T> MaxValueChanged;
+
+        protected BindableNumber(T value = default)
             : base(value)
         {
             MinValue = DefaultMinValue;
             MaxValue = DefaultMaxValue;
+            precision = DefaultPrecision;
         }
 
-        /// <summary>
-        /// The minimum value of this bindable. <see cref="Bindable{T}.Value"/> will never go below this value.
-        /// </summary>
-        public T MinValue { get; set; }
 
-        /// <summary>
-        /// The maximim value of this bindable. <see cref="Bindable{T}.Value"/> will never go above this value.
-        /// </summary>
-        public T MaxValue { get; set; }
+        private T precision;
+
+        public T Precision
+        {
+            get => precision;
+            set
+            {
+                if (precision.Equals(value))
+                    return;
+
+                if (Convert.ToDouble(value) <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(Precision), "Must be greater than 0.");
+
+                precision = value;
+
+                TriggerPrecisionChange();
+            }
+        }
+
+        public override T Value
+        {
+            get => base.Value;
+            set
+            {
+                if (Precision.CompareTo(DefaultPrecision) > 0)
+                {
+                    double doubleValue = Convert.ToDouble(clamp(value, MinValue, MaxValue));
+                    doubleValue = Math.Round(doubleValue / Convert.ToDouble(Precision)) * Convert.ToDouble(Precision);
+
+                    base.Value = (T)Convert.ChangeType(doubleValue, typeof(T), CultureInfo.InvariantCulture);
+                }
+                else
+                    base.Value = clamp(value, MinValue, MaxValue);
+            }
+        }
+
+        private T minValue;
+
+        public T MinValue
+        {
+            get => minValue;
+            set
+            {
+                if (minValue.Equals(value))
+                    return;
+
+                minValue = value;
+
+                TriggerMinValueChange();
+            }
+        }
+
+        private T maxValue;
+
+        public T MaxValue
+        {
+            get => maxValue;
+            set
+            {
+                if (maxValue.Equals(value))
+                    return;
+
+                maxValue = value;
+
+                TriggerMaxValueChange();
+            }
+        }
 
         /// <summary>
         /// The default <see cref="MinValue"/>. This should be equal to the minimum value of type <see cref="T"/>.
@@ -54,16 +121,101 @@ namespace osu.Framework.Configuration
         protected abstract T DefaultMinValue { get; }
 
         /// <summary>
-        /// /// The default <see cref="MaxValue"/>. This should be equal to the maximum value of type <see cref="T"/>.
+        /// The default <see cref="MaxValue"/>. This should be equal to the maximum value of type <see cref="T"/>.
         /// </summary>
         protected abstract T DefaultMaxValue { get; }
+
+        /// <summary>
+        /// The default <see cref="Precision"/>.
+        /// </summary>
+        protected abstract T DefaultPrecision { get; }
+
+        public override void TriggerChange()
+        {
+            base.TriggerChange();
+
+            TriggerPrecisionChange(false);
+            TriggerMinValueChange(false);
+            TriggerMaxValueChange(false);
+        }
+
+        protected void TriggerPrecisionChange(bool propagateToBindings = true)
+        {
+            // check a bound bindable hasn't changed the value again (it will fire its own event)
+            T beforePropagation = precision;
+
+            if (propagateToBindings)
+            {
+                Bindings?.ForEachAlive(b =>
+                {
+                    if (b is BindableNumber<T> bn)
+                        bn.Precision = precision;
+                });
+            }
+
+            if (Equals(beforePropagation, precision))
+                PrecisionChanged?.Invoke(precision);
+        }
+
+        protected void TriggerMinValueChange(bool propagateToBindings = true)
+        {
+            // check a bound bindable hasn't changed the value again (it will fire its own event)
+            T beforePropagation = minValue;
+
+            if (propagateToBindings)
+            {
+                Bindings?.ForEachAlive(b =>
+                {
+                    if (b is BindableNumber<T> bn)
+                        bn.MinValue = minValue;
+                });
+            }
+
+            if (Equals(beforePropagation, minValue))
+                MinValueChanged?.Invoke(minValue);
+        }
+
+        protected void TriggerMaxValueChange(bool propagateToBindings = true)
+        {
+            // check a bound bindable hasn't changed the value again (it will fire its own event)
+            T beforePropagation = maxValue;
+
+            if (propagateToBindings)
+            {
+                Bindings?.ForEachAlive(b =>
+                {
+                    if (b is BindableNumber<T> bn)
+                        bn.MaxValue = maxValue;
+                });
+            }
+
+            if (Equals(beforePropagation, maxValue))
+                MaxValueChanged?.Invoke(maxValue);
+        }
+
+        public override void BindTo(Bindable<T> them)
+        {
+            if (them is BindableNumber<T> other)
+            {
+                Precision = max(Precision, other.Precision);
+                MinValue = max(MinValue, other.MinValue);
+                MaxValue = min(MaxValue, other.MaxValue);
+
+                if (MinValue.CompareTo(MaxValue) > 0)
+                    throw new ArgumentOutOfRangeException(
+                        $"Can not weld bindable longs with non-overlapping min/max-ranges. The ranges were [{MinValue} - {MaxValue}] and [{other.MinValue} - {other.MaxValue}].", nameof(them));
+            }
+
+            base.BindTo(them);
+        }
 
         /// <summary>
         /// Whether this bindable has a user-defined range that is not the full range of the <see cref="T"/> type.
         /// </summary>
         public bool HasDefinedRange => !MinValue.Equals(DefaultMinValue) || !MaxValue.Equals(DefaultMaxValue);
 
-        public static implicit operator T(BindableNumber<T> value) => value?.Value ?? default(T);
+        public static implicit operator T(BindableNumber<T> value) =>
+            value?.Value ?? throw new InvalidCastException($"Casting a null {nameof(BindableNumber<T>)} to a {nameof(T)} is likely a mistake");
 
         public bool IsInteger
         {
@@ -213,11 +365,29 @@ namespace osu.Framework.Configuration
             var max = Convert.ToDouble(MaxValue);
             var value = min + (max - min) * amt;
             if (snap > 0)
-            {
-                var floor = Math.Floor(value / snap) * snap;
-                value = MathHelper.Clamp(value - floor < snap / 2f ? floor : floor + snap, min, max);
-            }
+                value = Math.Round(value / snap) * snap;
             Set(value);
         }
+
+        IBindableNumber<T> IBindableNumber<T>.GetBoundCopy() => GetBoundCopy();
+
+        public new BindableNumber<T> GetBoundCopy() => (BindableNumber<T>)base.GetBoundCopy();
+
+        public new BindableNumber<T> GetUnboundCopy() => (BindableNumber<T>)base.GetUnboundCopy();
+
+        private static T max(T value1, T value2)
+        {
+            var comparison = value1.CompareTo(value2);
+            return comparison > 0 ? value1 : value2;
+        }
+
+        private static T min(T value1, T value2)
+        {
+            var comparison = value1.CompareTo(value2);
+            return comparison > 0 ? value2 : value1;
+        }
+
+        private static T clamp(T value, T minValue, T maxValue)
+            => max(minValue, min(maxValue, value));
     }
 }

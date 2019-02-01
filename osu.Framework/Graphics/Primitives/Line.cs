@@ -1,15 +1,15 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
-using OpenTK;
+using osuTK;
 
 namespace osu.Framework.Graphics.Primitives
 {
     /// <summary>
     /// Represents a single line segment.  Drawing is handled by the LineManager class.
     /// </summary>
-    public class Line : ICloneable
+    public class Line
     {
         /// <summary>
         /// Begin point of the line.

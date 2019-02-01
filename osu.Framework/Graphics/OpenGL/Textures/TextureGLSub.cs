@@ -1,12 +1,12 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using osu.Framework.Graphics.Primitives;
-using RectangleF = osu.Framework.Graphics.Primitives.RectangleF;
-using OpenTK;
+using osuTK;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.OpenGL.Vertices;
+using osu.Framework.Graphics.Textures;
 
 namespace osu.Framework.Graphics.OpenGL.Textures
 {
@@ -33,14 +33,14 @@ namespace osu.Framework.Graphics.OpenGL.Textures
 
         public override int Height
         {
-            get { return bounds.Height; }
-            set { bounds.Height = value; }
+            get => bounds.Height;
+            set => bounds.Height = value;
         }
 
         public override int Width
         {
-            get { return bounds.Width; }
-            set { bounds.Width = value; }
+            get => bounds.Width;
+            set => bounds.Width = value;
         }
 
         private RectangleF boundsInParent(RectangleF? textureRect)
@@ -90,7 +90,7 @@ namespace osu.Framework.Graphics.OpenGL.Textures
             return parent.Bind();
         }
 
-        public override void SetData(TextureUpload upload)
+        public override void SetData(ITextureUpload upload)
         {
             if (upload.Bounds.Width > bounds.Width || upload.Bounds.Height > bounds.Height)
                 throw new ArgumentOutOfRangeException(
@@ -101,8 +101,12 @@ namespace osu.Framework.Graphics.OpenGL.Textures
                 upload.Bounds = bounds;
             else
             {
-                upload.Bounds.X += bounds.X;
-                upload.Bounds.Y += bounds.Y;
+                var adjustedBounds = upload.Bounds;
+
+                adjustedBounds.X += bounds.X;
+                adjustedBounds.Y += bounds.Y;
+
+                upload.Bounds = adjustedBounds;
             }
 
             parent?.SetData(upload);

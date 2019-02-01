@@ -1,22 +1,19 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
-using OpenTK;
-using OpenTK.Graphics;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
+    [System.ComponentModel.Description("changing depth of child dynamically")]
     public class TestCaseDynamicDepth : TestCase
     {
-        public override string Description => @"Dynamically change depth of a child.";
-
         private void addDepthSteps(DepthBox box, Container container)
         {
             AddStep($@"bring forward {box.Name}", () => container.ChangeChildDepth(box, box.Depth - 1));

@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
@@ -48,11 +48,18 @@ namespace osu.Framework.Statistics
         DrawNodeCtor,
         DrawNodeAppl,
         ScheduleInvk,
+        InputQueue,
+        PositionalIQ,
+        /// <summary>
+        /// See <see cref="osu.Framework.Graphics.Containers.CompositeDrawable.CheckChildrenLife"/>.
+        /// </summary>
+        CCL,
 
         VBufBinds,
         VBufOverflow,
         TextureBinds,
         DrawCalls,
+        ShaderBinds,
         VerticesDraw,
         VerticesUpl,
         Pixels,
@@ -65,5 +72,6 @@ namespace osu.Framework.Statistics
 
         MouseEvents,
         KeyEvents,
+        JoystickEvents,
     }
 }

@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Runtime.InteropServices;
-using OpenTK;
+using osuTK;
 
 namespace osu.Framework.Platform.Windows
 {
@@ -12,7 +12,8 @@ namespace osu.Framework.Platform.Windows
     /// </summary>
     internal class TimePeriod : IDisposable
     {
-        private static TimeCaps timeCapabilities;
+        private static readonly TimeCaps time_capabilities;
+
         private readonly int period;
 
         [DllImport(@"winmm.dll", ExactSpelling = true)]
@@ -24,14 +25,14 @@ namespace osu.Framework.Platform.Windows
         [DllImport(@"winmm.dll", ExactSpelling = true)]
         private static extern int timeEndPeriod(int uPeriod);
 
-        internal static int MinimumPeriod => timeCapabilities.wPeriodMin;
-        internal static int MaximumPeriod => timeCapabilities.wPeriodMax;
+        internal static int MinimumPeriod => time_capabilities.wPeriodMin;
+        internal static int MaximumPeriod => time_capabilities.wPeriodMax;
 
         private bool canAdjust = MaximumPeriod > 0;
 
         static TimePeriod()
         {
-            timeGetDevCaps(ref timeCapabilities, Marshal.SizeOf(typeof(TimeCaps)));
+            timeGetDevCaps(ref time_capabilities, Marshal.SizeOf(typeof(TimeCaps)));
         }
 
         internal TimePeriod(int period)
@@ -43,7 +44,7 @@ namespace osu.Framework.Platform.Windows
 
         internal bool Active
         {
-            get { return active; }
+            get => active;
             set
             {
                 if (value == active || !canAdjust) return;

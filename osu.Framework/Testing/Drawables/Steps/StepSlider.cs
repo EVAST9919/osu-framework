@@ -1,20 +1,20 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using OpenTK.Graphics;
+using osuTK.Graphics;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using System;
-using osu.Framework.Input;
 using osu.Framework.Extensions.Color4Extensions;
+using osu.Framework.Input.Events;
 
 namespace osu.Framework.Testing.Drawables.Steps
 {
     public class StepSlider<T> : SliderBar<T>
-        where T : struct
+        where T : struct, IComparable, IConvertible
     {
         private readonly Box selection;
         private readonly Box background;
@@ -67,7 +67,7 @@ namespace osu.Framework.Testing.Drawables.Steps
             currentNumber.SetDefault();
         }
 
-        protected override bool OnDragEnd(InputState state)
+        protected override bool OnDragEnd(DragEndEvent e)
         {
             var flash = new Box
             {
@@ -81,7 +81,7 @@ namespace osu.Framework.Testing.Drawables.Steps
             flash.FadeOut(200).Expire();
 
             Success();
-            return base.OnDragEnd(state);
+            return base.OnDragEnd(e);
         }
 
         protected override void UpdateValue(float normalizedValue)

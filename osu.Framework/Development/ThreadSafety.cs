@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System.Diagnostics;
 using System.Threading;
-using osu.Framework.Platform;
+using osu.Framework.Threading;
 
 namespace osu.Framework.Development
 {
@@ -12,32 +12,34 @@ namespace osu.Framework.Development
         [Conditional("DEBUG")]
         internal static void EnsureUpdateThread()
         {
-            //This check is very intrusive on performance, so let's only run when a debugger is actually attached.
-            if (!Debugger.IsAttached) return;
-
             Debug.Assert(IsUpdateThread);
         }
 
         [Conditional("DEBUG")]
         internal static void EnsureNotUpdateThread()
         {
-            //This check is very intrusive on performance, so let's only run when a debugger is actually attached.
-            if (!Debugger.IsAttached) return;
-
             Debug.Assert(!IsUpdateThread);
         }
 
         [Conditional("DEBUG")]
         internal static void EnsureDrawThread()
         {
-            //This check is very intrusive on performance, so let's only run when a debugger is actually attached.
-            if (!Debugger.IsAttached) return;
-
             Debug.Assert(IsDrawThread);
         }
 
-        public static bool IsUpdateThread => Thread.CurrentThread == GameHost.Instance.UpdateThread.Thread;
+        private static readonly ThreadLocal<bool> is_update_thread = new ThreadLocal<bool>(() =>
+            Thread.CurrentThread.Name == GameThread.PrefixedThreadNameFor("Update"));
 
-        public static bool IsDrawThread => Thread.CurrentThread == GameHost.Instance.DrawThread.Thread;
+        private static readonly ThreadLocal<bool> is_draw_thread = new ThreadLocal<bool>(() =>
+            Thread.CurrentThread.Name == GameThread.PrefixedThreadNameFor("Draw"));
+
+        private static readonly ThreadLocal<bool> is_audio_thread = new ThreadLocal<bool>(() =>
+            Thread.CurrentThread.Name == GameThread.PrefixedThreadNameFor("Audio"));
+
+        public static bool IsUpdateThread => is_update_thread.Value;
+
+        public static bool IsDrawThread => is_draw_thread.Value;
+
+        public static bool IsAudioThread => is_audio_thread.Value;
     }
 }

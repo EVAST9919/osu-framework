@@ -1,20 +1,18 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Input;
+using osu.Framework.Input.Events;
 using osu.Framework.Testing;
-using OpenTK;
-using OpenTK.Graphics;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCasePadding : GridTestCase
+    public class TestCasePadding : GridTestCase
     {
         public TestCasePadding() : base(2, 2)
         {
@@ -175,8 +173,6 @@ namespace osu.Framework.Tests.Visual
             });
         }
 
-        public override string Description => @"Add fixed padding via a PaddingContainer";
-
         private class PaddedBox : Container
         {
             private readonly SpriteText t1;
@@ -238,15 +234,15 @@ namespace osu.Framework.Tests.Visual
                 return base.Invalidate(invalidation, source, shallPropagate);
             }
 
-            protected override bool OnDrag(InputState state)
+            protected override bool OnDrag(DragEvent e)
             {
-                Position += state.Mouse.Delta;
+                Position += e.Delta;
                 return true;
             }
 
-            protected override bool OnDragEnd(InputState state) => true;
+            protected override bool OnDragEnd(DragEndEvent e) => true;
 
-            protected override bool OnDragStart(InputState state) => true;
+            protected override bool OnDragStart(DragStartEvent e) => true;
         }
     }
 }

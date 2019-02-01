@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
@@ -58,10 +58,7 @@ namespace osu.Framework.Audio
             Frequency.ValueChanged += InvalidateState;
         }
 
-        internal void InvalidateState(double newValue = 0)
-        {
-            PendingActions.Enqueue(OnStateChanged);
-        }
+        internal void InvalidateState(double newValue = 0) => EnqueueAction(OnStateChanged);
 
         internal virtual void OnStateChanged()
         {
@@ -84,7 +81,7 @@ namespace osu.Framework.Audio
             RemoveAdjustment(AdjustableProperty.Volume, component.VolumeCalculated);
         }
 
-        public void AddAdjustment(AdjustableProperty type, BindableDouble adjustBindable)
+        public void AddAdjustment(AdjustableProperty type, BindableDouble adjustBindable) => EnqueueAction(() =>
         {
             switch (type)
             {
@@ -109,9 +106,9 @@ namespace osu.Framework.Audio
             }
 
             InvalidateState();
-        }
+        });
 
-        public void RemoveAdjustment(AdjustableProperty type, BindableDouble adjustBindable)
+        public void RemoveAdjustment(AdjustableProperty type, BindableDouble adjustBindable) => EnqueueAction(() =>
         {
             switch (type)
             {
@@ -127,7 +124,7 @@ namespace osu.Framework.Audio
             }
 
             InvalidateState();
-        }
+        });
 
         protected override void Dispose(bool disposing)
         {

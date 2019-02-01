@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Runtime.InteropServices;
@@ -45,9 +45,6 @@ namespace osu.Framework.Platform.Windows
 
         [DllImport("kernel32.dll")]
         private static extern IntPtr GlobalFree(IntPtr hMem);
-
-        [DllImport("kernel32.dll", EntryPoint = "CopyMemory", SetLastError = false)]
-        public static extern void CopyMemory(IntPtr dest, IntPtr src, uint count);
 
         private const uint cf_unicodetext = 13U;
 
@@ -121,7 +118,10 @@ namespace osu.Framework.Platform.Windows
 
                     try
                     {
-                        CopyMemory(target, source, bytes);
+                        unsafe
+                        {
+                            Buffer.MemoryCopy((void*)source, (void*)target, bytes, bytes);
+                        }
                     }
                     finally
                     {

@@ -1,18 +1,29 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using osu.Framework.Configuration;
-using osu.Framework.Input;
+using osu.Framework.Input.Events;
 
 namespace osu.Framework.Graphics.Containers
 {
     public class ClickableContainer : Container
     {
-        public Action Action;
-        public readonly BindableBool Enabled = new BindableBool(true);
+        private Action action;
 
-        protected override bool OnClick(InputState state)
+        public Action Action
+        {
+            get => action;
+            set
+            {
+                action = value;
+                Enabled.Value = action != null;
+            }
+        }
+
+        public readonly BindableBool Enabled = new BindableBool();
+
+        protected override bool OnClick(ClickEvent e)
         {
             if (Enabled.Value)
                 Action?.Invoke();

@@ -1,12 +1,13 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using OpenTK;
+using System.Threading.Tasks;
+using osuTK;
 
 namespace osu.Framework.IO
 {
@@ -32,7 +33,7 @@ namespace osu.Framework.IO
 
         private readonly Stream underlyingStream;
 
-        private readonly Thread loadThread;
+        private CancellationTokenSource cancellationToken;
 
         /// <summary>
         /// A stream that buffers the underlying stream to contiguous memory, reading until the whole file is eventually memory-backed.
@@ -42,11 +43,8 @@ namespace osu.Framework.IO
         /// <param name="shared">Another AsyncBufferStream which is backing the same underlying stream. Allows shared usage of memory-backing.</param>
         public AsyncBufferStream(Stream stream, int blocksToReadAhead, AsyncBufferStream shared = null)
         {
-            if (stream == null)
-                throw new ArgumentNullException(nameof(stream));
-
+            underlyingStream = stream ?? throw new ArgumentNullException(nameof(stream));
             this.blocksToReadAhead = blocksToReadAhead;
-            underlyingStream = stream;
 
             if (underlyingStream.CanSeek)
                 underlyingStream.Seek(0, SeekOrigin.Begin);
@@ -63,13 +61,8 @@ namespace osu.Framework.IO
                 isLoaded = shared.isLoaded;
             }
 
-
-            loadThread = new Thread(loadRequiredBlocks)
-            {
-                Name = @"AsyncBufferStream_Load",
-                IsBackground = true
-            };
-            loadThread.Start();
+            cancellationToken = new CancellationTokenSource();
+            Task.Factory.StartNew(loadRequiredBlocks, cancellationToken.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         }
 
         ~AsyncBufferStream()
@@ -79,48 +72,44 @@ namespace osu.Framework.IO
 
         private void loadRequiredBlocks()
         {
-            try
+            if (isLoaded)
+                return;
+
+            int last = -1;
+            while (!isLoaded && !isClosed)
             {
-                if (isLoaded)
-                    return;
+                cancellationToken.Token.ThrowIfCancellationRequested();
 
-                int last = -1;
-                while (!isLoaded && !isClosed)
+                int curr = nextBlockToLoad;
+                if (curr < 0)
                 {
-                    int curr = nextBlockToLoad;
-                    if (curr < 0)
-                    {
-                        Thread.Sleep(1);
-                        continue;
-                    }
-
-                    int readStart = curr * block_size;
-
-                    if (last + 1 != curr)
-                    {
-                        //follow along with a seek.
-                        Debug.Assert(underlyingStream.CanSeek);
-                        underlyingStream.Seek(readStart, SeekOrigin.Begin);
-                    }
-
-                    Trace.Assert(underlyingStream.Position == readStart);
-
-                    int readSize = Math.Min(data.Length - readStart, block_size);
-                    int read = underlyingStream.Read(data, readStart, readSize);
-
-                    Trace.Assert(read == readSize);
-
-                    blockLoadedStatus[curr] = true;
-                    last = curr;
-
-                    isLoaded |= blockLoadedStatus.All(loaded => loaded);
+                    Thread.Sleep(1);
+                    continue;
                 }
 
-                if (!isClosed) underlyingStream?.Close();
+                int readStart = curr * block_size;
+
+                if (last + 1 != curr)
+                {
+                    //follow along with a seek.
+                    Debug.Assert(underlyingStream.CanSeek);
+                    underlyingStream.Seek(readStart, SeekOrigin.Begin);
+                }
+
+                Trace.Assert(underlyingStream.Position == readStart);
+
+                int readSize = Math.Min(data.Length - readStart, block_size);
+                int read = underlyingStream.Read(data, readStart, readSize);
+
+                Trace.Assert(read == readSize);
+
+                blockLoadedStatus[curr] = true;
+                last = curr;
+
+                isLoaded |= blockLoadedStatus.All(loaded => loaded);
             }
-            catch (ThreadAbortException)
-            {
-            }
+
+            if (!isClosed) underlyingStream?.Close();
         }
 
         private int nextBlockToLoad
@@ -148,7 +137,9 @@ namespace osu.Framework.IO
         {
             isDisposed = true;
 
-            loadThread?.Abort();
+            cancellationToken?.Cancel();
+            cancellationToken?.Dispose();
+            cancellationToken = null;
 
             if (!isClosed) Close();
             base.Dispose(disposing);
@@ -173,9 +164,8 @@ namespace osu.Framework.IO
 
         public override long Position
         {
-            get { return position; }
-
-            set { position = MathHelper.Clamp((int)value, 0, data.Length); }
+            get => position;
+            set => position = MathHelper.Clamp((int)value, 0, data.Length);
         }
 
         public override void Flush()

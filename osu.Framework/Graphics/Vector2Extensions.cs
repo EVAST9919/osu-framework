@@ -1,8 +1,8 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
-using OpenTK;
+using osuTK;
 
 namespace osu.Framework.Graphics
 {
@@ -14,8 +14,7 @@ namespace osu.Framework.Graphics
         /// <returns>The transformed position</returns>
         public static Vector2 Transform(Vector2 pos, Matrix3 mat)
         {
-            Vector2 result;
-            Transform(ref pos, ref mat, out result);
+            Transform(ref pos, ref mat, out Vector2 result);
             return result;
         }
 
@@ -37,8 +36,7 @@ namespace osu.Framework.Graphics
         /// <returns>The distance</returns>
         public static float Distance(Vector2 vec1, Vector2 vec2)
         {
-            float result;
-            Distance(ref vec1, ref vec2, out result);
+            Distance(ref vec1, ref vec2, out float result);
             return result;
         }
 
@@ -61,8 +59,7 @@ namespace osu.Framework.Graphics
         /// <returns>The squared distance</returns>
         public static float DistanceSquared(Vector2 vec1, Vector2 vec2)
         {
-            float result;
-            DistanceSquared(ref vec1, ref vec2, out result);
+            DistanceSquared(ref vec1, ref vec2, out float result);
             return result;
         }
 

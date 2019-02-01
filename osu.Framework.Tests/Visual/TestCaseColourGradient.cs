@@ -1,19 +1,17 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
-using OpenTK;
-using OpenTK.Graphics;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCaseColourGradient : GridTestCase
+    public class TestCaseColourGradient : GridTestCase
     {
         public TestCaseColourGradient() : base(2, 2)
         {
@@ -80,8 +78,6 @@ namespace osu.Framework.Tests.Visual
                 });
             }
         }
-
-        public override string Description => @"Various cases of colour gradients.";
 
         private readonly Box[] boxes = new Box[4];
 

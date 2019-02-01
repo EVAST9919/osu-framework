@@ -1,7 +1,6 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
@@ -9,15 +8,15 @@ using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
-using OpenTK;
-using OpenTK.Graphics;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCaseEffects : TestCase
+    [System.ComponentModel.Description("implementing the IEffect interface")]
+    public class TestCaseEffects : TestCase
     {
-        public override string Description => "Tests classes implement the IEffect interface.";
+        private readonly SpriteText changeColourText;
 
         public TestCaseEffects()
         {
@@ -144,8 +143,104 @@ namespace osu.Framework.Tests.Visual
                             }),
                         }
                     },
+                    new Container
+                    {
+                        AutoSizeAxes = Axes.Both,
+                        Children = new Drawable[]
+                        {
+                            new Box
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Colour = Color4.White,
+                                Size = new Vector2(150, 40),
+                            }.WithEffect(new GlowEffect
+                            {
+                                BlurSigma = new Vector2(3f),
+                                Strength = 3f,
+                                Colour = ColourInfo.GradientHorizontal(new Color4(1.2f, 0, 0, 1f), new Color4(0, 1f, 0, 1f)),
+                                PadExtent = true,
+                            }),
+                            changeColourText = new SpriteText
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Text = "Absolute Size",
+                                TextSize = 32f,
+                                Colour = Color4.Red,
+                                Shadow = true,
+                            }
+                        }
+                    },
+                    new Container
+                    {
+                        AutoSizeAxes = Axes.Both,
+                        Children = new Drawable[]
+                        {
+                            new Box
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Colour = Color4.White,
+                                RelativeSizeAxes = Axes.Both,
+                                Size = new Vector2(1.1f, 1.1f),
+                            }.WithEffect(new GlowEffect
+                            {
+                                BlurSigma = new Vector2(3f),
+                                Strength = 3f,
+                                Colour = ColourInfo.GradientHorizontal(new Color4(1.2f, 0, 0, 1f), new Color4(0, 1f, 0, 1f)),
+                                PadExtent = true,
+                            }),
+                            new SpriteText
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Text = "Relative Size",
+                                TextSize = 32f,
+                                Colour = Color4.Red,
+                                Shadow = true,
+                            },
+                        }
+                    },
+                    new Container
+                    {
+                        AutoSizeAxes = Axes.Both,
+                        Children = new Drawable[]
+                        {
+                            new Box
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Colour = Color4.White,
+                                RelativeSizeAxes = Axes.Both,
+                                Size = new Vector2(1.1f, 1.1f),
+                                Rotation = 10,
+                            }.WithEffect(new GlowEffect
+                            {
+                                BlurSigma = new Vector2(3f),
+                                Strength = 3f,
+                                Colour = ColourInfo.GradientHorizontal(new Color4(1.2f, 0, 0, 1f), new Color4(0, 1f, 0, 1f)),
+                                PadExtent = true,
+                            }),
+                            new SpriteText
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Text = "Rotation",
+                                TextSize = 32f,
+                                Colour = Color4.Red,
+                                Shadow = true,
+                            },
+                        }
+                    },
                 }
             });
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            changeColourText.FadeColour(Color4.Black, 1000).Then().FadeColour(Color4.Red, 1000).Loop();
         }
     }
 }

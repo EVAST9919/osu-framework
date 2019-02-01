@@ -1,38 +1,37 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
-using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Lines;
-using osu.Framework.Graphics.OpenGL.Textures;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input;
+using osu.Framework.Input.Events;
 using osu.Framework.Testing;
-using OpenTK;
-using OpenTK.Graphics;
+using osuTK;
+using osuTK.Graphics;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCaseInputResampler : GridTestCase
+    [System.ComponentModel.Description("live path optimiastion")]
+    public class TestCaseInputResampler : GridTestCase
     {
         public TestCaseInputResampler() : base(3, 3)
         {
             const int width = 2;
             Texture gradientTexture = new Texture(width, 1, true);
-            byte[] data = new byte[width * 4];
+            var image = new Image<Rgba32>(width, 1);
+
             for (int i = 0; i < width; ++i)
             {
-                float brightness = (float)i / (width - 1);
-                int index = i * 4;
-                data[index + 0] = (byte)(brightness * 255);
-                data[index + 1] = (byte)(brightness * 255);
-                data[index + 2] = (byte)(brightness * 255);
-                data[index + 3] = 255;
+                var brightnessByte = (byte)((float)i / (width - 1) * 255);
+                image[i, 0] = new Rgba32(brightnessByte, brightnessByte, brightnessByte);
             }
-            gradientTexture.SetData(new TextureUpload(data));
+
+            gradientTexture.SetData(new TextureUpload(image));
 
             SpriteText[] text = new SpriteText[6];
 
@@ -121,9 +120,7 @@ namespace osu.Framework.Tests.Visual
             Colour = Color4.White,
         };
 
-        public override string Description => @"Live optimizing paths to relevant nodes.";
-
-        private class SmoothedPath : Path
+        private class SmoothedPath : TexturedPath
         {
             protected SmoothedPath()
             {
@@ -184,24 +181,22 @@ namespace osu.Framework.Tests.Visual
 
         private class UserDrawnPath : SmoothedPath
         {
-            public override bool HandleInput => true;
-
             public SpriteText DrawText;
 
             protected virtual void AddUserVertex(Vector2 v) => AddRawVertex(v);
 
-            protected override bool OnDragStart(InputState state)
+            protected override bool OnDragStart(DragStartEvent e)
             {
-                AddUserVertex(state.Mouse.Position);
+                AddUserVertex(e.MousePosition);
                 DrawText.Text = "Custom Smoothed Drawn: Smoothed=" + NumVertices + ", Raw=" + NumRaw;
                 return true;
             }
 
-            protected override bool OnDrag(InputState state)
+            protected override bool OnDrag(DragEvent e)
             {
-                AddUserVertex(state.Mouse.Position);
+                AddUserVertex(e.MousePosition);
                 DrawText.Text = "Custom Smoothed Drawn: Smoothed=" + NumVertices + ", Raw=" + NumRaw;
-                return base.OnDrag(state);
+                return base.OnDrag(e);
             }
         }
 

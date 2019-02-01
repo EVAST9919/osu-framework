@@ -1,11 +1,11 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.InteropServices;
-using OpenTK;
+using osuTK;
 
 namespace osu.Framework.Graphics.Primitives
 {
@@ -49,12 +49,12 @@ namespace osu.Framework.Graphics.Primitives
         }
 
         /// <summary>Gets or sets the coordinates of the upper-left corner of this <see cref="T:System.Drawing.RectangleF"></see> structure.</summary>
-        /// <returns>A <see cref="OpenTK.Vector2"/> that represents the upper-left corner of this <see cref="T:System.Drawing.RectangleF"></see> structure.</returns>
+        /// <returns>A <see cref="osuTK.Vector2"/> that represents the upper-left corner of this <see cref="T:System.Drawing.RectangleF"></see> structure.</returns>
         /// <filterpriority>1</filterpriority>
         [Browsable(false)]
         public Vector2 Location
         {
-            get { return new Vector2(X, Y); }
+            get => new Vector2(X, Y);
             set
             {
                 X = value.X;
@@ -63,12 +63,12 @@ namespace osu.Framework.Graphics.Primitives
         }
 
         /// <summary>Gets or sets the size of this <see cref="T:System.Drawing.RectangleF"></see>.</summary>
-        /// <returns>A <see cref="OpenTK.Vector2"/> that represents the width and height of this <see cref="T:System.Drawing.RectangleF"></see> structure.</returns>
+        /// <returns>A <see cref="osuTK.Vector2"/> that represents the width and height of this <see cref="T:System.Drawing.RectangleF"></see> structure.</returns>
         /// <filterpriority>1</filterpriority>
         [Browsable(false)]
         public Vector2 Size
         {
-            get { return new Vector2(Width, Height); }
+            get => new Vector2(Width, Height);
             set
             {
                 Width = value.X;
@@ -310,11 +310,23 @@ namespace osu.Framework.Graphics.Primitives
         // This could be optimized further in the future, but made for a simple implementation right now.
         public RectangleI AABB => ((Quad)this).AABB;
 
+        /// <summary>
+        /// Constructs a <see cref="RectangleF"/> from left, top, right, and bottom coordinates.
+        /// </summary>
+        /// <param name="left">The left coordinate.</param>
+        /// <param name="top">The top coordinate.</param>
+        /// <param name="right">The right coordinate.</param>
+        /// <param name="bottom">The bottom coordinate.</param>
+        /// <returns>The <see cref="RectangleF"/>.</returns>
+        public static RectangleF FromLTRB(float left, float top, float right, float bottom) => new RectangleF(left, top, right - left, bottom - top);
+
         /// <summary>Converts the specified <see cref="T:System.Drawing.RectangleI"></see> structure to a <see cref="T:System.Drawing.RectangleF"></see> structure.</summary>
         /// <returns>The <see cref="T:System.Drawing.RectangleF"></see> structure that is converted from the specified <see cref="T:System.Drawing.RectangleI"></see> structure.</returns>
         /// <param name="r">The <see cref="T:System.Drawing.RectangleI"></see> structure to convert. </param>
         /// <filterpriority>3</filterpriority>
         public static implicit operator RectangleF(RectangleI r) => new RectangleF(r.X, r.Y, r.Width, r.Height);
+
+        public static implicit operator System.Drawing.RectangleF(RectangleF r) => new System.Drawing.RectangleF(r.X, r.Y, r.Width, r.Height);
 
         /// <summary>Converts the Location and <see cref="T:System.Drawing.Size"></see> of this <see cref="T:System.Drawing.RectangleF"></see> to a human-readable string.</summary>
         /// <returns>A string that contains the position, width, and height of this <see cref="T:System.Drawing.RectangleF"></see> structure¾for example, "{X=20, Y=20, Width=100, Height=50}".</returns>

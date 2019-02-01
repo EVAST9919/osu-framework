@@ -1,41 +1,44 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Allocation;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input;
-using OpenTK;
-using OpenTK.Graphics;
+using osu.Framework.Input.Events;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Framework.Graphics.Cursor
 {
-    public class CursorContainer : OverlayContainer, IRequireHighFrequencyMousePosition
+    public class CursorContainer : VisibilityContainer, IRequireHighFrequencyMousePosition
     {
         public Drawable ActiveCursor { get; protected set; }
-
-        protected override bool BlockPassThroughMouse => false;
-
-        //OverlayContainer tried to be smart about this, but we don't want none of that.
-        public override bool HandleInput => IsPresent;
 
         public CursorContainer()
         {
             Depth = float.MinValue;
             RelativeSizeAxes = Axes.Both;
 
-            Add(ActiveCursor = CreateCursor());
-
             State = Visibility.Visible;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            Add(ActiveCursor = CreateCursor());
         }
 
         protected virtual Drawable CreateCursor() => new Cursor();
 
-        public override bool ReceiveMouseInputAt(Vector2 screenSpacePos) => true;
+        public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => true;
 
-        protected override bool OnMouseMove(InputState state)
+        public override bool PropagatePositionalInputSubTree => IsPresent; // make sure we are still updating position during possible fade out.
+
+        protected override bool OnMouseMove(MouseMoveEvent e)
         {
-            ActiveCursor.Position = state.Mouse.Position;
-            return base.OnMouseMove(state);
+            ActiveCursor.Position = e.MousePosition;
+            return base.OnMouseMove(e);
         }
 
         protected override void PopIn()

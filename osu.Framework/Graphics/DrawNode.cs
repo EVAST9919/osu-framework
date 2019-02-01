@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics.OpenGL;
 using System;
@@ -19,6 +19,8 @@ namespace osu.Framework.Graphics
         /// </summary>
         public DrawInfo DrawInfo;
 
+        public DrawColourInfo DrawColourInfo;
+
         /// <summary>
         /// Identifies the state of this draw node with an invalidation state of its corresponding
         /// <see cref="Drawable"/>. Whenever the invalidation state of this draw node disagrees
@@ -34,7 +36,7 @@ namespace osu.Framework.Graphics
         /// textured sprites.</param>
         public virtual void Draw(Action<TexturedVertex2D> vertexAction)
         {
-            GLWrapper.SetBlend(DrawInfo.Blending);
+            GLWrapper.SetBlend(DrawColourInfo.Blending);
         }
     }
 }

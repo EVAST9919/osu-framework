@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Concurrent;
@@ -13,6 +13,11 @@ namespace osu.Framework.Allocation
     public class TimedExpiryCache<TKey, TValue> : IDisposable
     {
         private readonly ConcurrentDictionary<TKey, TimedObject<TValue>> dictionary = new ConcurrentDictionary<TKey, TimedObject<TValue>>();
+
+        /// <summary>
+        /// Whether <see cref="IDisposable"/> items should be disposed on removal.
+        /// </summary>
+        public bool DisposeOnRemoval = true;
 
         /// <summary>
         /// Time in milliseconds after last access after which items will be cleaned up.
@@ -31,7 +36,7 @@ namespace osu.Framework.Allocation
             timer = new Timer(checkExpiry, null, 0, CheckPeriod);
         }
 
-        internal void Add(TKey key, TValue value)
+        public void Add(TKey key, TValue value)
         {
             dictionary.TryAdd(key, new TimedObject<TValue>(value));
         }
@@ -42,19 +47,19 @@ namespace osu.Framework.Allocation
 
             foreach (var v in dictionary)
             {
-                TimedObject<TValue> val;
                 if ((now - v.Value.LastAccessTime).TotalMilliseconds > ExpiryTime)
-                    dictionary.TryRemove(v.Key, out val);
+                {
+                    if (dictionary.TryRemove(v.Key, out TimedObject<TValue> removed) && DisposeOnRemoval)
+                        (removed.Value as IDisposable)?.Dispose();
+                }
             }
         }
 
         public bool TryGetValue(TKey key, out TValue value)
         {
-            TimedObject<TValue> timed;
-
-            if (!dictionary.TryGetValue(key, out timed))
+            if (!dictionary.TryGetValue(key, out TimedObject<TValue> timed))
             {
-                value = default(TValue);
+                value = default;
                 return false;
             }
 

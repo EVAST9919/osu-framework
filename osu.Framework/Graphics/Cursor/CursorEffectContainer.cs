@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input;
@@ -13,6 +13,8 @@ namespace osu.Framework.Graphics.Cursor
         where TSelf : CursorEffectContainer<TSelf, TTarget>
         where TTarget : class, IDrawable
     {
+        public override bool HandlePositionalInput => true;
+
         private InputManager inputManager;
 
         protected override void LoadComplete()
@@ -87,13 +89,12 @@ namespace osu.Framework.Graphics.Cursor
             }
         }
 
-        protected TTarget FindTarget()
+        protected List<TTarget> FindTargets()
         {
             findTargetChildren();
 
-            // If we found any valid effect targets, pick the _last_ one as it
-            // represents the front-most drawn one.
-            TTarget result = targetChildren.LastOrDefault();
+            List<TTarget> result = new List<TTarget>(targetChildren);
+            result.Reverse();
 
             // Clean up
             childDrawables.Clear();

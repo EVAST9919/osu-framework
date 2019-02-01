@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
 
@@ -20,9 +20,6 @@ namespace osu.Framework.IO.Stores
             Namespace = ns;
         }
 
-        protected override List<string> GetFilenames(string name)
-        {
-            return base.GetFilenames($@"{Namespace}/{name}");
-        }
+        protected override IEnumerable<string> GetFilenames(string name) => base.GetFilenames($@"{Namespace}/{name}");
     }
 }

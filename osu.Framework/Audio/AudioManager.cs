@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
@@ -12,6 +12,7 @@ using osu.Framework.Threading;
 using System.Linq;
 using System.Diagnostics;
 using osu.Framework.Extensions.TypeExtensions;
+using osu.Framework.Logging;
 
 namespace osu.Framework.Audio
 {
@@ -85,6 +86,9 @@ namespace osu.Framework.Audio
         /// </summary>
         public Scheduler EventScheduler;
 
+        private readonly Lazy<TrackManager> globalTrackManager;
+        private readonly Lazy<SampleManager> globalSampleManager;
+
         /// <summary>
         /// Constructs an AudioManager given a track resource store, and a sample resource store.
         /// </summary>
@@ -99,14 +103,14 @@ namespace osu.Framework.Audio
             sampleStore.AddExtension(@"wav");
             sampleStore.AddExtension(@"mp3");
 
-            Thread = new AudioThread(Update, @"Audio");
+            Thread = new AudioThread(Update);
             Thread.Start();
+
+            globalTrackManager = new Lazy<TrackManager>(() => GetTrackManager(trackStore));
+            globalSampleManager = new Lazy<SampleManager>(() => GetSampleManager(sampleStore));
 
             scheduler.Add(() =>
             {
-                globalTrackManager = GetTrackManager(trackStore);
-                globalSampleManager = GetSampleManager(sampleStore);
-
                 try
                 {
                     setAudioDevice();
@@ -136,9 +140,6 @@ namespace osu.Framework.Audio
             scheduler.Add(() => setAudioDevice(string.IsNullOrEmpty(newDevice) ? null : newDevice));
         }
 
-        private TrackManager globalTrackManager;
-        private SampleManager globalSampleManager;
-
         /// <summary>
         /// Returns a list of the names of recognized audio devices.
         /// </summary>
@@ -153,10 +154,10 @@ namespace osu.Framework.Audio
         /// Obtains the <see cref="TrackManager"/> corresponding to a given resource store.
         /// Returns the global <see cref="TrackManager"/> if no resource store is passed.
         /// </summary>
-        /// <param name="store">The <see cref="T:ResourceStore"/> of which to retrieve the <see cref="TrackManager"/>.</param>
-        public TrackManager GetTrackManager(ResourceStore<byte[]> store = null)
+        /// <param name="store">The <see cref="IResourceStore{T}"/> of which to retrieve the <see cref="TrackManager"/>.</param>
+        public TrackManager GetTrackManager(IResourceStore<byte[]> store = null)
         {
-            if (store == null) return globalTrackManager;
+            if (store == null) return globalTrackManager.Value;
 
             TrackManager tm = new TrackManager(store);
             AddItem(tm);
@@ -170,10 +171,10 @@ namespace osu.Framework.Audio
         /// Obtains the <see cref="SampleManager"/> corresponding to a given resource store.
         /// Returns the global <see cref="SampleManager"/> if no resource store is passed.
         /// </summary>
-        /// <param name="store">The <see cref="T:ResourceStore"/> of which to retrieve the <see cref="SampleManager"/>.</param>
-        public SampleManager GetSampleManager(ResourceStore<byte[]> store = null)
+        /// <param name="store">The <see cref="IResourceStore{T}"/> of which to retrieve the <see cref="SampleManager"/>.</param>
+        public SampleManager GetSampleManager(IResourceStore<byte[]> store = null)
         {
-            if (store == null) return globalSampleManager;
+            if (store == null) return globalSampleManager.Value;
 
             SampleManager sm = new SampleManager(store);
             AddItem(sm);
@@ -210,15 +211,14 @@ namespace osu.Framework.Audio
                 oldDeviceValid &= oldDeviceInfo.IsEnabled && oldDeviceInfo.IsInitialized;
             }
 
-            if (newDevice == oldDevice)
-            {
-                //check the old device is still valid
-                if (oldDeviceValid)
-                    return true;
-            }
+            if (newDevice == oldDevice && oldDeviceValid)
+                return true;
 
             if (string.IsNullOrEmpty(newDevice))
+            {
+                Logger.Log(@"BASS Initialization failed (no audio device present)");
                 return false;
+            }
 
             int newDeviceIndex = audioDevices.FindIndex(df => df.Name == newDevice);
 
@@ -267,6 +267,12 @@ namespace osu.Framework.Audio
             }
 
             Trace.Assert(Bass.LastError == Errors.OK);
+
+            Logger.Log($@"BASS Initialized
+                          BASS Version:               {Bass.Version}
+                          BASS FX Version:            {ManagedBass.Fx.BassFx.Version}
+                          Device:                     {newDeviceInfo.Name}
+                          Drive:                      {newDeviceInfo.Driver}");
 
             //we have successfully initialised a new device.
             currentAudioDevice = newDevice;

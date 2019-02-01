@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.IO.Stores;
 
@@ -16,7 +16,9 @@ namespace osu.Framework.Audio.Track
 
         public Track Get(string name)
         {
-            TrackBass track = new TrackBass(store.GetStream(name));
+            if (string.IsNullOrEmpty(name)) return null;
+
+            Track track = new TrackBass(store.GetStream(name));
             AddItem(track);
             return track;
         }

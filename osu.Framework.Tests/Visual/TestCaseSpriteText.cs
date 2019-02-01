@@ -1,7 +1,6 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
@@ -9,11 +8,8 @@ using osu.Framework.Testing;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCaseSpriteText : TestCase
+    public class TestCaseSpriteText : TestCase
     {
-        public override string Description => @"Test all sizes of text rendering";
-
         public TestCaseSpriteText()
         {
             FillFlowContainer flow;
@@ -51,11 +47,19 @@ namespace osu.Framework.Tests.Visual
 
             for (int i = 1; i <= 200; i++)
             {
+                string font = "OpenSans-";
+                if (i % 4 > 1)
+                    font += "Bold";
+                if (i % 2 == 1)
+                    font += "Italic";
+
+                font = font.TrimEnd('-');
+
                 SpriteText text = new SpriteText
                 {
                     Text = $@"Font testy at size {i}",
+                    Font = font,
                     AllowMultiline = true,
-                    AutoSizeAxes = Axes.Y,
                     RelativeSizeAxes = Axes.X,
                     TextSize = i
                 };

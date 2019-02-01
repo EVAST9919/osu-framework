@@ -1,14 +1,16 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.IO;
 using System.Threading;
 using ManagedBass;
 using ManagedBass.Fx;
-using OpenTK;
+using osuTK;
 using osu.Framework.IO;
 using System.Diagnostics;
+using System.Threading.Tasks;
+using osu.Framework.Audio.Callbacks;
 
 namespace osu.Framework.Audio.Track
 {
@@ -36,13 +38,20 @@ namespace osu.Framework.Audio.Track
         /// </summary>
         private bool isPlayed;
 
+        private FileCallbacks fileCallbacks;
+
         private volatile bool isLoaded;
 
         public override bool IsLoaded => isLoaded;
 
+        /// <summary>
+        /// Constructs a new <see cref="TrackBass"/> from provided audio data.
+        /// </summary>
+        /// <param name="data">The sample data stream.</param>
+        /// <param name="quick">If true, the track will not be fully loaded, and should only be used for preview purposes.  Defaults to false.</param>
         public TrackBass(Stream data, bool quick = false)
         {
-            PendingActions.Enqueue(() =>
+            EnqueueAction(() =>
             {
                 Preview = quick;
 
@@ -51,10 +60,10 @@ namespace osu.Framework.Audio.Track
                 //encapsulate incoming stream with async buffer if it isn't already.
                 dataStream = data as AsyncBufferStream ?? new AsyncBufferStream(data, quick ? 8 : -1);
 
-                var procs = new DataStreamFileProcedures(dataStream);
+                fileCallbacks = new FileCallbacks(new DataStreamFileProcedures(dataStream));
 
-                BassFlags flags = Preview ? 0 : BassFlags.Decode | BassFlags.Prescan | BassFlags.Float;
-                activeStream = Bass.CreateStream(StreamSystem.NoBuffer, flags, procs.BassProcedures, IntPtr.Zero);
+                BassFlags flags = Preview ? 0 : BassFlags.Decode | BassFlags.Prescan;
+                activeStream = Bass.CreateStream(StreamSystem.NoBuffer, flags, fileCallbacks.Callbacks, fileCallbacks.Handle);
 
                 if (!Preview)
                 {
@@ -74,14 +83,21 @@ namespace osu.Framework.Audio.Track
                     Bass.ChannelSetAttribute(activeStream, ChannelAttribute.TempoSequenceMilliseconds, 30);
                 }
 
-                Length = Bass.ChannelBytes2Seconds(activeStream, Bass.ChannelGetLength(activeStream)) * 1000;
+                // will be -1 in case of an error
+                double seconds = Bass.ChannelBytes2Seconds(activeStream, Bass.ChannelGetLength(activeStream));
 
-                float frequency;
-                Bass.ChannelGetAttribute(activeStream, ChannelAttribute.Frequency, out frequency);
-                initialFrequency = frequency;
-                bitrate = (int)Bass.ChannelGetAttribute(activeStream, ChannelAttribute.Bitrate);
+                bool success = seconds >= 0;
 
-                isLoaded = true;
+                if (success)
+                {
+                    Length = seconds * 1000;
+
+                    Bass.ChannelGetAttribute(activeStream, ChannelAttribute.Frequency, out float frequency);
+                    initialFrequency = frequency;
+                    bitrate = (int)Bass.ChannelGetAttribute(activeStream, ChannelAttribute.Bitrate);
+
+                    isLoaded = true;
+                }
             });
 
             InvalidateState();
@@ -136,6 +152,9 @@ namespace osu.Framework.Audio.Track
             dataStream?.Dispose();
             dataStream = null;
 
+            fileCallbacks?.Dispose();
+            fileCallbacks = null;
+
             base.Dispose(disposing);
         }
 
@@ -144,15 +163,16 @@ namespace osu.Framework.Audio.Track
         public override void Stop()
         {
             base.Stop();
-
-            PendingActions.Enqueue(() =>
-            {
-                if (Bass.ChannelIsActive(activeStream) == PlaybackState.Playing)
-                    Bass.ChannelPause(activeStream);
-
-                isPlayed = false;
-            });
+            StopAsync().Wait();
         }
+
+        public Task StopAsync() => EnqueueAction(() =>
+        {
+            if (Bass.ChannelIsActive(activeStream) == PlaybackState.Playing)
+                Bass.ChannelPause(activeStream);
+
+            isPlayed = false;
+        });
 
         private int direction;
 
@@ -165,31 +185,29 @@ namespace osu.Framework.Audio.Track
         public override void Start()
         {
             base.Start();
-            PendingActions.Enqueue(() =>
-            {
-                if (Bass.ChannelPlay(activeStream))
-                    isPlayed = true;
-                else
-                    isRunning = false;
-            });
+
+            StartAsync().Wait();
         }
 
-        private Action seekAction;
+        public Task StartAsync() => EnqueueAction(() =>
+        {
+            if (Bass.ChannelPlay(activeStream))
+                isPlayed = true;
+            else
+                isRunning = false;
+        });
 
-        public override bool Seek(double seek)
+        public override bool Seek(double seek) => SeekAsync(seek).Result;
+
+        public async Task<bool> SeekAsync(double seek)
         {
             // At this point the track may not yet be loaded which is indicated by a 0 length.
             // In that case we still want to return true, hence the conservative length.
             double conservativeLength = Length == 0 ? double.MaxValue : Length;
             double conservativeClamped = MathHelper.Clamp(seek, 0, conservativeLength);
 
-            Action action = null;
-
-            action = () =>
+            await EnqueueAction(() =>
             {
-                // we only want to run the most fresh seek event, else we may fall behind (seeks can be relatively expensive).
-                if (action != seekAction) return;
-
                 double clamped = MathHelper.Clamp(seek, 0, Length);
 
                 if (clamped != CurrentTime)
@@ -197,10 +215,7 @@ namespace osu.Framework.Audio.Track
                     long pos = Bass.ChannelSeconds2Bytes(activeStream, clamped / 1000d);
                     Bass.ChannelSetPosition(activeStream, pos);
                 }
-            };
-
-            seekAction = action;
-            PendingActions.Enqueue(action);
+            });
 
             return conservativeClamped == seek;
         }
@@ -233,12 +248,10 @@ namespace osu.Framework.Audio.Track
 
         public override int? Bitrate => bitrate;
 
-        public override bool HasCompleted => base.HasCompleted || IsLoaded && !IsRunning && CurrentTime >= Length;
-
         public double PitchAdjust
         {
-            get { return Frequency.Value; }
-            set { Frequency.Value = value; }
+            get => Frequency.Value;
+            set => Frequency.Value = value;
         }
 
         private TrackAmplitudes currentAmplitudes;

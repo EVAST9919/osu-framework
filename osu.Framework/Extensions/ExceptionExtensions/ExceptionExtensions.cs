@@ -1,7 +1,8 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Reflection;
 using System.Runtime.ExceptionServices;
 
 namespace osu.Framework.Extensions.ExceptionExtensions
@@ -24,7 +25,7 @@ namespace osu.Framework.Extensions.ExceptionExtensions
         /// This preserves the stack trace of the exception that is rethrown, and will not include the point of rethrow.
         /// </summary>
         /// <param name="aggregateException">The captured exception.</param>
-        public static void RethrowIfSingular(this AggregateException aggregateException) => aggregateException.AsSingular().Rethrow();
+        public static void RethrowAsSingular(this AggregateException aggregateException) => aggregateException.AsSingular().Rethrow();
 
         /// <summary>
         /// Flattens <paramref name="aggregateException"/> into a singular <see cref="Exception"/> if the <paramref name="aggregateException"/>
@@ -39,14 +40,26 @@ namespace osu.Framework.Extensions.ExceptionExtensions
 
             while (aggregateException.InnerExceptions.Count == 1)
             {
-                var innerAggregate = aggregateException.InnerException as AggregateException;
-                if (innerAggregate == null)
+                if (!(aggregateException.InnerException is AggregateException innerAggregate))
                     return aggregateException.InnerException;
 
                 aggregateException = innerAggregate;
             }
 
             return aggregateException;
+        }
+
+        /// <summary>
+        /// Retrieves the last exception from a recursive <see cref="TargetInvocationException"/>.
+        /// </summary>
+        /// <param name="exception">The exception to retrieve the exception from.</param>
+        /// <returns>The exception at the point of invocation.</returns>
+        public static Exception GetLastInvocation(this TargetInvocationException exception)
+        {
+            var inner = exception.InnerException;
+            while (inner is TargetInvocationException)
+                inner = inner.InnerException;
+            return inner;
         }
     }
 }

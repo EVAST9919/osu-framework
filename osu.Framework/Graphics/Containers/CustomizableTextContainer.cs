@@ -1,7 +1,6 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Graphics.Sprites;
 using System;
 using System.Collections.Generic;
 
@@ -70,12 +69,12 @@ namespace osu.Framework.Graphics.Containers
         /// <param name="factory">The factory method creating drawables.</param>
         protected void AddIconFactory(string name, Func<int, int, Drawable> factory) => iconFactories.Add(name, factory);
 
-        internal override IEnumerable<SpriteText> AddLine(TextLine line, bool newLineIsParagraph)
+        internal override IEnumerable<Drawable> AddLine(TextLine line, bool newLineIsParagraph)
         {
             if (!newLineIsParagraph)
                 AddInternal(new NewLineContainer(true));
 
-            var sprites = new List<SpriteText>();
+            var sprites = new List<Drawable>();
             int index = 0;
             string str = line.Text;
             while (index < str.Length)
@@ -111,12 +110,11 @@ namespace osu.Framework.Graphics.Containers
                                 throw new ArgumentException($"Missing ) in placeholder {placeholderStr}.");
                         }
 
-                        int placeholderIndex;
-                        if (int.TryParse(placeholderStr, out placeholderIndex))
+                        if (int.TryParse(placeholderStr, out int placeholderIndex))
                         {
                             if (placeholderIndex >= placeholders.Count)
                                 throw new ArgumentException($"This text has {placeholders.Count} placeholders. But placeholder with index {placeholderIndex} was used.");
-                            else if (placeholderIndex < 0)
+                            if (placeholderIndex < 0)
                                 throw new ArgumentException($"Negative placeholder indices are invalid. Index {placeholderIndex} was used.");
 
                             placeholderDrawable = placeholders[placeholderIndex];
@@ -134,15 +132,14 @@ namespace osu.Framework.Graphics.Containers
                                 args = new object[argStrs.Length];
                                 for (int i = 0; i < argStrs.Length; ++i)
                                 {
-                                    int argVal;
-                                    if (!int.TryParse(argStrs[i], out argVal))
+                                    if (!int.TryParse(argStrs[i], out int argVal))
                                         throw new ArgumentException($"The argument \"{argStrs[i]}\" in placeholder {placeholderStr} is not an integer.");
 
                                     args[i] = argVal;
                                 }
                             }
-                            Delegate cb;
-                            if (!iconFactories.TryGetValue(placeholderName, out cb))
+
+                            if (!iconFactories.TryGetValue(placeholderName, out Delegate cb))
                                 throw new ArgumentException($"There is no placeholder named {placeholderName}.");
 
                             placeholderDrawable = (Drawable)cb.DynamicInvoke(args);

@@ -1,26 +1,24 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System.Linq;
-using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
-using OpenTK;
-using OpenTK.Graphics;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCaseDelayedLoad : TestCase
+    public class TestCaseDelayedLoad : TestCase
     {
         private const int panel_count = 2048;
 
         public TestCaseDelayedLoad()
         {
-            FillFlowContainerNoInput flow;
+            FillFlowContainer<Container> flow;
             ScrollContainer scroll;
 
             Children = new Drawable[]
@@ -30,7 +28,7 @@ namespace osu.Framework.Tests.Visual
                     RelativeSizeAxes = Axes.Both,
                     Children = new Drawable[]
                     {
-                        flow = new FillFlowContainerNoInput
+                        flow = new FillFlowContainer<Container>
                         {
                             RelativeSizeAxes = Axes.X,
                             AutoSizeAxes = Axes.Y,
@@ -50,14 +48,14 @@ namespace osu.Framework.Tests.Visual
                             RelativeSizeAxes = Axes.Both,
                             Children = new Drawable[]
                             {
-                                new TestBox{ RelativeSizeAxes = Axes.Both }
+                                new TestBox { RelativeSizeAxes = Axes.Both }
                             }
                         }),
                         new SpriteText { Text = i.ToString() },
                     }
                 });
 
-            var childrenWithAvatarsLoaded = flow.Children.Where(c => c.Children.OfType<DelayedLoadWrapper>().First().Children.FirstOrDefault()?.IsLoaded ?? false);
+            var childrenWithAvatarsLoaded = flow.Children.Where(c => c.Children.OfType<DelayedLoadWrapper>().First().Content?.IsLoaded ?? false);
 
             AddWaitStep(10);
             AddStep("scroll down", () => scroll.ScrollToEnd());
@@ -66,29 +64,24 @@ namespace osu.Framework.Tests.Visual
             AddAssert("not too many loaded", () => childrenWithAvatarsLoaded.Count() < panel_count / 4);
         }
 
-        private class FillFlowContainerNoInput : FillFlowContainer<Container>
+        public class TestBox : Container
         {
-            public override bool HandleInput => false;
-        }
-    }
-
-    public class TestBox : Container
-    {
-        public TestBox()
-        {
-            RelativeSizeAxes = Axes.Both;
-        }
-
-        [BackgroundDependencyLoader]
-        private void load()
-        {
-            Child = new SpriteText
+            public TestBox()
             {
-                Colour = Color4.Yellow,
-                Text = @"loaded",
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-            };
+                RelativeSizeAxes = Axes.Both;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load()
+            {
+                Child = new SpriteText
+                {
+                    Colour = Color4.Yellow,
+                    Text = @"loaded",
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                };
+            }
         }
     }
 }

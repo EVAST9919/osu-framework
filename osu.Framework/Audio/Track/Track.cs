@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Configuration;
 using osu.Framework.Statistics;
@@ -15,7 +15,15 @@ namespace osu.Framework.Audio.Track
         /// </summary>
         public virtual bool IsDummyDevice => true;
 
+        /// <summary>
+        /// States if this track should repeat.
+        /// </summary>
         public bool Looping { get; set; }
+
+        /// <summary>
+        /// Point in time in milliseconds to restart the track to on loop or <see cref="Restart"/>.
+        /// </summary>
+        public double RestartPoint { get; set; }
 
         /// <summary>
         /// The speed of track playback. Does not affect pitch, but will reduce playback quality due to skipped frames.
@@ -40,6 +48,16 @@ namespace osu.Framework.Audio.Track
             Seek(0);
         }
 
+        /// <summary>
+        /// Restarts this track from the <see cref="RestartPoint"/> while retaining adjustments.
+        /// </summary>
+        public virtual void Restart()
+        {
+            Stop();
+            Seek(RestartPoint);
+            Start();
+        }
+
         public virtual void ResetSpeedAdjustments()
         {
             Frequency.Value = 1;
@@ -51,10 +69,21 @@ namespace osu.Framework.Audio.Track
         /// </summary>
         public abstract double CurrentTime { get; }
 
+        private double length;
+
         /// <summary>
         /// Length of the track in milliseconds.
         /// </summary>
-        public double Length { get; protected set; }
+        public double Length
+        {
+            get => length;
+            set
+            {
+                if (value < 0)
+                    throw new ArgumentException("Track length must be >= 0.", nameof(value));
+                length = value;
+            }
+        }
 
         public virtual int? Bitrate => null;
 
@@ -73,8 +102,6 @@ namespace osu.Framework.Audio.Track
 
         public virtual void Stop()
         {
-            if (IsDisposed)
-                throw new ObjectDisposedException(ToString(), "Can not stop disposed tracks.");
         }
 
         public abstract bool IsRunning { get; }
@@ -84,11 +111,13 @@ namespace osu.Framework.Audio.Track
         /// </summary>
         public virtual double Rate
         {
-            get { return Frequency * Tempo; }
-            set { Tempo.Value = value; }
+            get => Frequency * Tempo;
+            set => Tempo.Value = value;
         }
 
         public bool IsReversed => Rate < 0;
+
+        public override bool HasCompleted => IsLoaded && !IsRunning && CurrentTime >= Length;
 
         /// <summary>
         /// Current amplitude of stereo channels where 1 is full volume and 0 is silent.
@@ -102,10 +131,7 @@ namespace osu.Framework.Audio.Track
             FrameStatistics.Increment(StatisticsCounterType.Tracks);
 
             if (Looping && HasCompleted)
-            {
-                Reset();
-                Start();
-            }
+                Restart();
 
             base.UpdateState();
         }

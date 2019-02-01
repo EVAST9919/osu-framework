@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Caching;
 using osu.Framework.Graphics.Sprites;
@@ -23,7 +23,7 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public float FirstLineIndent
         {
-            get { return firstLineIndent; }
+            get => firstLineIndent;
             set
             {
                 if (value == firstLineIndent) return;
@@ -40,7 +40,7 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public float ContentIndent
         {
-            get { return contentIndent; }
+            get => contentIndent;
             set
             {
                 if (value == contentIndent) return;
@@ -58,7 +58,7 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public float ParagraphSpacing
         {
-            get { return paragraphSpacing; }
+            get => paragraphSpacing;
             set
             {
                 if (value == paragraphSpacing) return;
@@ -76,7 +76,7 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public float LineSpacing
         {
-            get { return lineSpacing; }
+            get => lineSpacing;
             set
             {
                 if (value == lineSpacing) return;
@@ -92,7 +92,7 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public Anchor TextAnchor
         {
-            get { return textAnchor; }
+            get => textAnchor;
             set
             {
                 if (textAnchor == value)
@@ -118,8 +118,6 @@ namespace osu.Framework.Graphics.Containers
             }
         }
 
-        public override bool HandleInput => false;
-
         public override bool Invalidate(Invalidation invalidation = Invalidation.All, Drawable source = null, bool shallPropagate = true)
         {
             if ((invalidation & Invalidation.DrawSize) > 0)
@@ -142,7 +140,7 @@ namespace osu.Framework.Graphics.Containers
         {
             // FillFlowContainer will reverse the ordering of right-anchored words such that the (previously) first word would be
             // the right-most word, whereas it should still be flowed left-to-right. This is achieved by reversing the comparator.
-            if ((TextAnchor & Anchor.x2) > 0)
+            if (TextAnchor.HasFlag(Anchor.x2))
                 return base.Compare(y, x);
             return base.Compare(x, y);
         }
@@ -150,18 +148,32 @@ namespace osu.Framework.Graphics.Containers
         /// <summary>
         /// Add new text to this text flow. The \n character will create a new paragraph, not just a line break. If you need \n to be a line break, use <see cref="AddParagraph(string, Action{SpriteText})"/> instead.
         /// </summary>
-        /// <returns>A collection of the <see cref="SpriteText" /> objects for each word created from the given text.</returns>
+        /// <returns>A collection of <see cref="Drawable" /> objects for each <see cref="SpriteText"/> word and <see cref="NewLineContainer"/> created from the given text.</returns>
         /// <param name="text">The text to add.</param>
         /// <param name="creationParameters">A callback providing any <see cref="SpriteText" /> instances created for this new text.</param>
-        public IEnumerable<SpriteText> AddText(string text, Action<SpriteText> creationParameters = null) => AddLine(new TextLine(text, creationParameters), true);
+        public IEnumerable<Drawable> AddText(string text, Action<SpriteText> creationParameters = null) => AddLine(new TextLine(text, creationParameters), true);
+
+        /// <summary>
+        /// Add an arbitrary <see cref="SpriteText"/> to this <see cref="TextFlowContainer"/>.
+        /// While default creation parameters are applied automatically, word wrapping is unavailable for contained words.
+        /// This should only be used when a specialised <see cref="SpriteText"/> type is requried.
+        /// </summary>
+        /// <param name="text">The text to add.</param>
+        /// <param name="creationParameters">A callback providing any <see cref="SpriteText" /> instances created for this new text.</param>
+        public void AddText(SpriteText text, Action<SpriteText> creationParameters = null)
+        {
+            base.Add(text);
+            defaultCreationParameters?.Invoke(text);
+            creationParameters?.Invoke(text);
+        }
 
         /// <summary>
         /// Add a new paragraph to this text flow. The \n character will create a line break. If you need \n to be a new paragraph, not just a line break, use <see cref="AddText(string, Action{SpriteText})"/> instead.
         /// </summary>
-        /// <returns>A collection of the <see cref="SpriteText" /> objects for each word created from the given text.</returns>
+        /// <returns>A collection of <see cref="Drawable" /> objects for each <see cref="SpriteText"/> word and <see cref="NewLineContainer"/> created from the given text.</returns>
         /// <param name="paragraph">The paragraph to add.</param>
         /// <param name="creationParameters">A callback providing any <see cref="SpriteText" /> instances created for this new paragraph.</param>
-        public IEnumerable<SpriteText> AddParagraph(string paragraph, Action<SpriteText> creationParameters = null) => AddLine(new TextLine(paragraph, creationParameters), false);
+        public IEnumerable<Drawable> AddParagraph(string paragraph, Action<SpriteText> creationParameters = null) => AddLine(new TextLine(paragraph, creationParameters), false);
 
         /// <summary>
         /// End current line and start a new one.
@@ -193,27 +205,39 @@ namespace osu.Framework.Graphics.Containers
             throw new InvalidOperationException($"Use {nameof(AddText)} to add text to a {nameof(TextFlowContainer)}.");
         }
 
-        internal virtual IEnumerable<SpriteText> AddLine(TextLine line, bool newLineIsParagraph)
+        internal virtual IEnumerable<Drawable> AddLine(TextLine line, bool newLineIsParagraph)
         {
+            var sprites = new List<Drawable>();
+
             // !newLineIsParagraph effectively means that we want to add just *one* paragraph, which means we need to make sure that any previous paragraphs
             // are terminated. Thus, we add a NewLineContainer that indicates the end of the paragraph before adding our current paragraph.
             if (!newLineIsParagraph)
-                base.Add(new NewLineContainer(true));
+            {
+                var newLine = new NewLineContainer(true);
+                sprites.Add(newLine);
+                base.Add(newLine);
+            }
 
-            return AddString(line, newLineIsParagraph);
+            sprites.AddRange(AddString(line, newLineIsParagraph));
+
+            return sprites;
         }
 
-        internal IEnumerable<SpriteText> AddString(TextLine line, bool newLineIsParagraph)
+        internal IEnumerable<Drawable> AddString(TextLine line, bool newLineIsParagraph)
         {
             bool first = true;
-            var sprites = new List<SpriteText>();
+            var sprites = new List<Drawable>();
             foreach (string l in line.Text.Split('\n'))
             {
                 if (!first)
                 {
                     Drawable lastChild = Children.LastOrDefault();
                     if (lastChild != null)
-                        base.Add(new NewLineContainer(newLineIsParagraph));
+                    {
+                        var newLine = new NewLineContainer(newLineIsParagraph);
+                        sprites.Add(newLine);
+                        base.Add(newLine);
+                    }
                 }
 
                 foreach (string word in SplitWords(l))
@@ -265,8 +289,7 @@ namespace osu.Framework.Graphics.Containers
                 c.Anchor = TextAnchor;
                 c.Origin = TextAnchor;
 
-                NewLineContainer nlc = c as NewLineContainer;
-                if (nlc != null)
+                if (c is NewLineContainer nlc)
                 {
                     curLine.Add(nlc);
                     childrenByLine.Add(curLine);
@@ -299,8 +322,7 @@ namespace osu.Framework.Graphics.Containers
 
                 foreach (Drawable c in line)
                 {
-                    NewLineContainer nlc = c as NewLineContainer;
-                    if (nlc != null)
+                    if (c is NewLineContainer nlc)
                     {
                         nlc.Height = nlc.IndicatesNewParagraph ? (currentLineHeight == 0 ? lastLineHeight : currentLineHeight) * ParagraphSpacing : 0;
                         continue;
@@ -328,13 +350,14 @@ namespace osu.Framework.Graphics.Containers
             }
         }
 
-        internal class NewLineContainer : Container
+        protected override bool ForceNewRow(Drawable child) => child is NewLineContainer;
+
+        public class NewLineContainer : Container
         {
             public readonly bool IndicatesNewParagraph;
 
             public NewLineContainer(bool newParagraph)
             {
-                RelativeSizeAxes = Axes.X;
                 IndicatesNewParagraph = newParagraph;
             }
         }

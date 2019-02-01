@@ -1,11 +1,9 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using OpenTK;
+using osuTK;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
@@ -36,7 +34,7 @@ namespace osu.Framework.Tests.Visual
                 }
             };
 
-            typeDropdown.Items = Enum.GetNames(typeof(CountType)).Select(n => new KeyValuePair<string, CountType>(n, (CountType)Enum.Parse(typeof(CountType), n)));
+            typeDropdown.Items = (CountType[])Enum.GetValues(typeof(CountType));
             countType.BindTo(typeDropdown.Current);
             countType.ValueChanged += v => beginStep(lastStep)();
 

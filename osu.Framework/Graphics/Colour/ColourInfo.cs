@@ -1,11 +1,11 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
-using OpenTK;
+using osuTK;
 using osu.Framework.Graphics.Primitives;
 using System.Diagnostics;
-using OpenTK.Graphics;
+using osuTK.Graphics;
 
 namespace osu.Framework.Graphics.Colour
 {
@@ -13,7 +13,7 @@ namespace osu.Framework.Graphics.Colour
     /// ColourInfo contains information about the colours of all 4 vertices of a quad.
     /// These colours are always stored in linear space.
     /// </summary>
-    public struct ColourInfo : IEquatable<ColourInfo>
+    public struct ColourInfo : IEquatable<ColourInfo>, IEquatable<SRGBColour>
     {
         public SRGBColour TopLeft;
         public SRGBColour BottomLeft;
@@ -50,7 +50,7 @@ namespace osu.Framework.Graphics.Colour
         }
 
         /// <summary>
-        /// Creates a ColourInfo with a horizontal gradient.
+        /// Creates a ColourInfo with a vertical gradient.
         /// </summary>
         /// <param name="c1">The top colour of the gradient.</param>
         /// <param name="c2">The bottom colour of the gradient.</param>
@@ -200,13 +200,10 @@ namespace osu.Framework.Graphics.Colour
             }
         }
 
-        public override string ToString()
-        {
-            if (HasSingleColour)
-                return $@"{TopLeft} (Single)";
-
-            else return $@"{TopLeft}, {TopRight}, {BottomLeft}, {BottomRight}";
-        }
+        public override string ToString() =>
+            HasSingleColour ?
+            $@"{TopLeft} (Single)" :
+            $@"{TopLeft}, {TopRight}, {BottomLeft}, {BottomRight}";
 
         public static implicit operator ColourInfo(SRGBColour colour) => SingleColour(colour);
         public static implicit operator SRGBColour(ColourInfo colour) => colour.singleColour;

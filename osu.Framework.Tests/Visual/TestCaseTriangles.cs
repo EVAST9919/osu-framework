@@ -1,22 +1,18 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Input;
+using osu.Framework.Input.Events;
 using osu.Framework.Testing;
-using OpenTK;
-using OpenTK.Graphics;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCaseTriangles : TestCase
+    public class TestCaseTriangles : TestCase
     {
-        public override string Description => @"Various scenarios which potentially challenge triangles.";
-
         private readonly Container testContainer;
 
         public TestCaseTriangles()
@@ -174,21 +170,20 @@ namespace osu.Framework.Tests.Visual
     internal class DraggableTriangle : Triangle
     {
         public bool AllowDrag = true;
-        public override bool HandleInput => true;
 
-        protected override bool OnDrag(InputState state)
+        protected override bool OnDrag(DragEvent e)
         {
             if (!AllowDrag) return false;
 
-            Position += state.Mouse.Delta;
+            Position += e.Delta;
             return true;
         }
 
-        protected override bool OnDragEnd(InputState state)
+        protected override bool OnDragEnd(DragEndEvent e)
         {
             return true;
         }
 
-        protected override bool OnDragStart(InputState state) => AllowDrag;
+        protected override bool OnDragStart(DragStartEvent e) => AllowDrag;
     }
 }

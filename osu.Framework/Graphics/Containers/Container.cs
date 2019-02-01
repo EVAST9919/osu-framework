@@ -1,13 +1,14 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Lists;
 using System.Collections.Generic;
 using System;
 using osu.Framework.Extensions.TypeExtensions;
 using osu.Framework.Graphics.Colour;
-using OpenTK;
+using osuTK;
 using System.Collections;
+using System.Diagnostics;
 
 namespace osu.Framework.Graphics.Containers
 {
@@ -57,6 +58,9 @@ namespace osu.Framework.Graphics.Containers
         /// The publicly accessible list of children. Forwards to the children of <see cref="Content"/>.
         /// If <see cref="Content"/> is this container, then returns <see cref="CompositeDrawable.InternalChildren"/>.
         /// Assigning to this property will dispose all existing children of this Container.
+        /// <remarks>
+        /// If a foreach loop is used, iterate over the <see cref="Container"/> directly rather than its <see cref="Children"/>.
+        /// </remarks>
         /// </summary>
         public IReadOnlyList<T> Children
         {
@@ -67,10 +71,7 @@ namespace osu.Framework.Graphics.Containers
 
                 return internalChildrenAsT;
             }
-            set
-            {
-                ChildrenEnumerable = value;
-            }
+            set => ChildrenEnumerable = value;
         }
 
         /// <summary>
@@ -101,17 +102,11 @@ namespace osu.Framework.Graphics.Containers
                 array[arrayIndex++] = c;
         }
 
-        /// <summary>
-        /// Gets the enumerator over <see cref="Children"/>.
-        /// </summary>
-        /// <returns>The enumerator over <see cref="Children"/>.</returns>
-        public IEnumerator<T> GetEnumerator() => Children.GetEnumerator();
+        public Enumerator GetEnumerator() => new Enumerator(this);
 
-        /// <summary>
-        /// Gets the enumerator over <see cref="Children"/>.
-        /// </summary>
-        /// <returns>The enumerator over <see cref="Children"/>.</returns>
-        IEnumerator IEnumerable.GetEnumerator() => Children.GetEnumerator();
+        IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         /// <summary>
         /// Sets all children of this container to the elements contained in the enumerable.
@@ -128,6 +123,7 @@ namespace osu.Framework.Graphics.Containers
         /// <summary>
         /// Gets or sets the only child of this container.
         /// </summary>
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         public T Child
         {
             get
@@ -164,7 +160,11 @@ namespace osu.Framework.Graphics.Containers
         /// <summary>
         /// Checks whether a given child is contained within <see cref="Children"/>.
         /// </summary>
-        public bool Contains(T drawable) => IndexOf(drawable) >= 0;
+        public bool Contains(T drawable)
+        {
+            int index = IndexOf(drawable);
+            return index >= 0 && this[index] == drawable;
+        }
 
         /// <summary>
         /// Adds a child to this container. This amount to adding a child to <see cref="Content"/>'s
@@ -193,7 +193,7 @@ namespace osu.Framework.Graphics.Containers
 
         protected internal override void AddInternal(Drawable drawable)
         {
-            if (Content == this && !(drawable is T))
+            if (Content == this && drawable != null && !(drawable is T))
                 throw new InvalidOperationException($"Only {typeof(T).ReadableName()} type drawables may be added to a container of type {GetType().ReadableName()} which does not redirect {nameof(Content)}.");
 
             base.AddInternal(drawable);
@@ -202,13 +202,7 @@ namespace osu.Framework.Graphics.Containers
         /// <summary>
         /// Removes a given child from this container.
         /// </summary>
-        public virtual bool Remove(T drawable)
-        {
-            if (Content != this)
-                return Content.Remove(drawable);
-            else
-                return RemoveInternal(drawable);
-        }
+        public virtual bool Remove(T drawable) => Content != this ? Content.Remove(drawable) : RemoveInternal(drawable);
 
         /// <summary>
         /// Removes all children which match the given predicate.
@@ -278,12 +272,10 @@ namespace osu.Framework.Graphics.Containers
         /// <param name="newDepth">The new depth value to be set.</param>
         public void ChangeChildDepth(T child, float newDepth)
         {
-            if (!Contains(child))
-                throw new InvalidOperationException("Can not change depth of drawable which is not contained within this container.");
-
-            Remove(child);
-            child.Depth = newDepth;
-            Add(child);
+            if (Content != this)
+                Content.ChangeChildDepth(child, newDepth);
+            else
+                ChangeInternalChildDepth(child, newDepth);
         }
 
         /// <summary>
@@ -292,8 +284,8 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new bool Masking
         {
-            get { return base.Masking; }
-            set { base.Masking = value; }
+            get => base.Masking;
+            set => base.Masking = value;
         }
 
         /// <summary>
@@ -302,8 +294,8 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new float MaskingSmoothness
         {
-            get { return base.MaskingSmoothness; }
-            set { base.MaskingSmoothness = value; }
+            get => base.MaskingSmoothness;
+            set => base.MaskingSmoothness = value;
         }
 
         /// <summary>
@@ -312,8 +304,8 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new float CornerRadius
         {
-            get { return base.CornerRadius; }
-            set { base.CornerRadius = value; }
+            get => base.CornerRadius;
+            set => base.CornerRadius = value;
         }
 
         /// <summary>
@@ -328,8 +320,8 @@ namespace osu.Framework.Graphics.Containers
         /// </remarks>
         public new float BorderThickness
         {
-            get { return base.BorderThickness; }
-            set { base.BorderThickness = value; }
+            get => base.BorderThickness;
+            set => base.BorderThickness = value;
         }
 
         /// <summary>
@@ -338,8 +330,8 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new SRGBColour BorderColour
         {
-            get { return base.BorderColour; }
-            set { base.BorderColour = value; }
+            get => base.BorderColour;
+            set => base.BorderColour = value;
         }
 
         /// <summary>
@@ -349,8 +341,8 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new EdgeEffectParameters EdgeEffect
         {
-            get { return base.EdgeEffect; }
-            set { base.EdgeEffect = value; }
+            get => base.EdgeEffect;
+            set => base.EdgeEffect = value;
         }
 
         /// <summary>
@@ -359,8 +351,8 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new MarginPadding Padding
         {
-            get { return base.Padding; }
-            set { base.Padding = value; }
+            get => base.Padding;
+            set => base.Padding = value;
         }
 
         /// <summary>
@@ -369,8 +361,8 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new Vector2 RelativeChildSize
         {
-            get { return base.RelativeChildSize; }
-            set { base.RelativeChildSize = value; }
+            get => base.RelativeChildSize;
+            set => base.RelativeChildSize = value;
         }
 
         /// <summary>
@@ -379,8 +371,8 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new Vector2 RelativeChildOffset
         {
-            get { return base.RelativeChildOffset; }
-            set { base.RelativeChildOffset = value; }
+            get => base.RelativeChildOffset;
+            set => base.RelativeChildOffset = value;
         }
 
         /// <summary>
@@ -393,8 +385,8 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new Axes AutoSizeAxes
         {
-            get { return base.AutoSizeAxes; }
-            set { base.AutoSizeAxes = value; }
+            get => base.AutoSizeAxes;
+            set => base.AutoSizeAxes = value;
         }
 
         /// <summary>
@@ -403,8 +395,8 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new float AutoSizeDuration
         {
-            get { return base.AutoSizeDuration; }
-            set { base.AutoSizeDuration = value; }
+            get => base.AutoSizeDuration;
+            set => base.AutoSizeDuration = value;
         }
 
         /// <summary>
@@ -413,8 +405,33 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public new Easing AutoSizeEasing
         {
-            get { return base.AutoSizeEasing; }
-            set { base.AutoSizeEasing = value; }
+            get => base.AutoSizeEasing;
+            set => base.AutoSizeEasing = value;
+        }
+
+        public struct Enumerator : IEnumerator<T>
+        {
+            private Container<T> container;
+            private int currentIndex;
+
+            internal Enumerator(Container<T> container)
+            {
+                this.container = container;
+                currentIndex = -1; // The first MoveNext() should bring the iterator to 0
+            }
+
+            public bool MoveNext() => ++currentIndex < container.Count;
+
+            public void Reset() => currentIndex = -1;
+
+            public T Current => container[currentIndex];
+
+            object IEnumerator.Current => Current;
+
+            public void Dispose()
+            {
+                container = null;
+            }
         }
     }
 }

@@ -1,10 +1,10 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Textures;
-using OpenTK;
+using osuTK;
 using osu.Framework.Graphics.Shaders;
 using osu.Framework.Allocation;
 
@@ -37,21 +37,12 @@ namespace osu.Framework.Graphics.Sprites
         /// </summary>
         public Vector2 EdgeSmoothness = Vector2.Zero;
 
-        /// <summary>
-        /// True if the <see cref="Texture"/> should be disposed when this sprite gets disposed.
-        /// </summary>
-        public bool CanDisposeTexture { get; protected set; }
-
         #region Disposal
 
         protected override void Dispose(bool isDisposing)
         {
-            if (CanDisposeTexture && texture != null)
-            {
-                if (!(texture is TextureWhitePixel))
-                    texture.Dispose();
-                texture = null;
-            }
+            texture?.Dispose();
+            texture = null;
 
             base.Dispose(isDisposing);
         }
@@ -86,23 +77,22 @@ namespace osu.Framework.Graphics.Sprites
         private Texture texture;
 
         /// <summary>
-        /// The texture that this sprite should draw. If <see cref="CanDisposeTexture"/> is true and the texture gets replaced, the old texture will be disposed.
+        /// The texture that this sprite should draw. Any previous texture will be disposed.
         /// If this sprite's <see cref="Drawable.Size"/> is <see cref="Vector2.Zero"/> (eg if it has not been set previously), the <see cref="Drawable.Size"/>
         /// of this sprite will be set to the size of the texture.
         /// <see cref="Drawable.FillAspectRatio"/> is automatically set to the aspect ratio of the given texture or 1 if the texture is null.
         /// </summary>
         public Texture Texture
         {
-            get { return texture; }
+            get => texture;
             set
             {
                 if (value == texture)
                     return;
 
-                if (texture != null && CanDisposeTexture)
-                    texture.Dispose();
-
+                texture?.Dispose();
                 texture = value;
+
                 FillAspectRatio = (float)(texture?.Width ?? 1) / (texture?.Height ?? 1);
                 Invalidate(Invalidation.DrawNode);
 
@@ -135,7 +125,7 @@ namespace osu.Framework.Graphics.Sprites
         {
             string result = base.ToString();
             if (!string.IsNullOrEmpty(texture?.AssetName))
-                result += $" tex: {texture?.AssetName}";
+                result += $" tex: {texture.AssetName}";
             return result;
         }
     }

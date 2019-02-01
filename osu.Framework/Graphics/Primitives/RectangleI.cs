@@ -1,11 +1,11 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.InteropServices;
-using OpenTK;
+using osuTK;
 
 namespace osu.Framework.Graphics.Primitives
 {
@@ -38,7 +38,7 @@ namespace osu.Framework.Graphics.Primitives
         }
 
         /// <summary>Gets or sets the coordinates of the upper-left corner of this <see cref="T:System.Drawing.RectangleI"></see> structure.</summary>
-        /// <returns>A <see cref="OpenTK.Vector2"/> that represents the upper-left corner of this <see cref="T:System.Drawing.RectangleI"></see> structure.</returns>
+        /// <returns>A <see cref="osuTK.Vector2"/> that represents the upper-left corner of this <see cref="T:System.Drawing.RectangleI"></see> structure.</returns>
         /// <filterpriority>1</filterpriority>
         [Browsable(false)]
         public Vector2I Location
@@ -47,7 +47,7 @@ namespace osu.Framework.Graphics.Primitives
         }
 
         /// <summary>Gets or sets the size of this <see cref="T:System.Drawing.RectangleI"></see>.</summary>
-        /// <returns>A <see cref="OpenTK.Vector2"/> that represents the width and height of this <see cref="T:System.Drawing.RectangleI"></see> structure.</returns>
+        /// <returns>A <see cref="osuTK.Vector2"/> that represents the width and height of this <see cref="T:System.Drawing.RectangleI"></see> structure.</returns>
         /// <filterpriority>1</filterpriority>
         [Browsable(false)]
         public Vector2I Size

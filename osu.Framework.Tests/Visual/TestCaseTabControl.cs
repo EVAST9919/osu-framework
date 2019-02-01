@@ -1,27 +1,22 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
 using osu.Framework.Extensions;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Testing;
-using OpenTK;
-using OpenTK.Graphics;
+using osu.Framework.Input;
+using osuTK;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCaseTabControl : TestCase
+    public class TestCaseTabControl : TestCase
     {
-        public override string Description => @"Tab control";
-
         public TestCaseTabControl()
         {
             List<KeyValuePair<string, TestEnum>> items = new List<KeyValuePair<string, TestEnum>>();
@@ -37,15 +32,42 @@ namespace osu.Framework.Tests.Visual
 
             StyledTabControl pinnedAndAutoSort = new StyledTabControl
             {
-                Position = new Vector2(500, 50),
+                Position = new Vector2(200, 150),
                 Size = new Vector2(200, 30),
                 AutoSort = true
             };
             items.GetRange(0, 7).AsEnumerable().ForEach(item => pinnedAndAutoSort.AddItem(item.Value));
             pinnedAndAutoSort.PinItem(TestEnum.Test5);
 
+            StyledTabControl switchingTabControl;
+            PlatformActionContainer platformActionContainer = new PlatformActionContainer
+            {
+                Child = switchingTabControl = new StyledTabControl
+                {
+                    Position = new Vector2(200, 250),
+                    Size = new Vector2(200, 30),
+                }
+            };
+            items.AsEnumerable().ForEach(item => switchingTabControl.AddItem(item.Value));
+
+            StyledTabControl removeAllTabControl = new StyledTabControl
+            {
+                Position = new Vector2(200, 350),
+                Size = new Vector2(200, 30)
+            };
+
+            var withoutDropdownTabControl = new StyledTabControlWithoutDropdown
+            {
+                Position = new Vector2(200, 450),
+                Size = new Vector2(200, 30)
+            };
+            items.AsEnumerable().ForEach(item => withoutDropdownTabControl.AddItem(item.Value));
+
             Add(simpleTabcontrol);
             Add(pinnedAndAutoSort);
+            Add(platformActionContainer);
+            Add(removeAllTabControl);
+            Add(withoutDropdownTabControl);
 
             var nextTest = new Func<TestEnum>(() => items.AsEnumerable()
                                                          .Select(item => item.Value)
@@ -62,9 +84,9 @@ namespace osu.Framework.Tests.Visual
 
             AddStep("RemoveItem", () =>
             {
-                if (pinnedAndAutoSort.Any())
+                if (pinnedAndAutoSort.Items.Any())
                 {
-                    pinnedAndAutoSort.RemoveItem(pinnedAndAutoSort.Items.Last());
+                    pinnedAndAutoSort.RemoveItem(pinnedAndAutoSort.Items.First());
                 }
             });
 
@@ -84,38 +106,45 @@ namespace osu.Framework.Tests.Visual
             {
                 if (pinned.Count > 0) pinnedAndAutoSort.UnpinItem(pinned.Pop());
             });
+
+            AddStep("Set first tab", () => switchingTabControl.Current.Value = switchingTabControl.VisibleItems.First());
+            AddStep("Switch forward", () => platformActionContainer.TriggerPressed(new PlatformAction(PlatformActionType.DocumentNext)));
+            AddAssert("Ensure second tab", () => switchingTabControl.Current.Value == switchingTabControl.VisibleItems.ElementAt(1));
+
+            AddStep("Switch backward", () => platformActionContainer.TriggerPressed(new PlatformAction(PlatformActionType.DocumentPrevious)));
+            AddAssert("Ensure first Tab", () => switchingTabControl.Current.Value == switchingTabControl.VisibleItems.First());
+
+            AddStep("Switch backward", () => platformActionContainer.TriggerPressed(new PlatformAction(PlatformActionType.DocumentPrevious)));
+            AddAssert("Ensure last tab", () => switchingTabControl.Current.Value == switchingTabControl.VisibleItems.Last());
+
+            AddStep("Switch forward", () => platformActionContainer.TriggerPressed(new PlatformAction(PlatformActionType.DocumentNext)));
+            AddAssert("Ensure first tab", () => switchingTabControl.Current.Value == switchingTabControl.VisibleItems.First());
+
+            AddStep("Add all items", () => items.AsEnumerable().ForEach(item => removeAllTabControl.AddItem(item.Value)));
+            AddAssert("Ensure all items", () => removeAllTabControl.Items.Count() == items.Count);
+
+            AddStep("Remove all items", () => removeAllTabControl.Clear());
+            AddAssert("Ensure no items", () => !removeAllTabControl.Items.Any());
+
+            AddAssert("Ensure any items", () => withoutDropdownTabControl.Items.Any());
+            AddStep("Remove all items", () => withoutDropdownTabControl.Clear());
+            AddAssert("Ensure no items", () => !withoutDropdownTabControl.Items.Any());
+        }
+
+        private class StyledTabControlWithoutDropdown : TabControl<TestEnum>
+        {
+            protected override Dropdown<TestEnum> CreateDropdown() => null;
+
+            protected override TabItem<TestEnum> CreateTabItem(TestEnum value)
+                => new BasicTabControl<TestEnum>.BasicTabItem(value);
         }
 
         private class StyledTabControl : TabControl<TestEnum>
         {
             protected override Dropdown<TestEnum> CreateDropdown() => new StyledDropdown();
 
-            protected override TabItem<TestEnum> CreateTabItem(TestEnum value) => new StyledTabItem(value);
-        }
-
-        private class StyledTabItem : TabItem<TestEnum>
-        {
-            private readonly SpriteText text;
-
-            public override bool IsRemovable => true;
-
-            public StyledTabItem(TestEnum value) : base(value)
-            {
-                AutoSizeAxes = Axes.Both;
-                Children = new Drawable[]
-                {
-                    text = new SpriteText
-                    {
-                        Margin = new MarginPadding(2),
-                        Text = value.ToString(),
-                        TextSize = 18
-                    }
-                };
-            }
-
-            protected override void OnActivated() => text.Colour = Color4.MediumPurple;
-
-            protected override void OnDeactivated() => text.Colour = Color4.White;
+            protected override TabItem<TestEnum> CreateTabItem(TestEnum value)
+                => new BasicTabControl<TestEnum>.BasicTabItem(value);
         }
 
         private class StyledDropdown : Dropdown<TestEnum>

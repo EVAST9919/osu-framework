@@ -1,12 +1,10 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Extensions.TypeExtensions;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
+using System.Threading;
+using osu.Framework.Extensions.TypeExtensions;
 
 namespace osu.Framework.Allocation
 {
@@ -15,11 +13,7 @@ namespace osu.Framework.Allocation
     /// </summary>
     public class DependencyContainer : IReadOnlyDependencyContainer
     {
-        private delegate object ObjectActivator(DependencyContainer dc, object instance);
-
-        private readonly ConcurrentDictionary<Type, ObjectActivator> activators = new ConcurrentDictionary<Type, ObjectActivator>();
-        private readonly ConcurrentDictionary<Type, object> cache = new ConcurrentDictionary<Type, object>();
-        private readonly HashSet<Type> cacheable = new HashSet<Type>();
+        private readonly Dictionary<CacheInfo, object> cache = new Dictionary<CacheInfo, object>(new CachedObjectComparer());
 
         private readonly IReadOnlyDependencyContainer parentContainer;
 
@@ -32,128 +26,152 @@ namespace osu.Framework.Allocation
             parentContainer = parent;
         }
 
-        private MethodInfo getLoaderMethod(Type type)
-        {
-            var loaderMethods = type.GetMethods(BindingFlags.NonPublic | BindingFlags.Instance).Where(
-                mi => mi.GetCustomAttribute<BackgroundDependencyLoader>() != null).ToArray();
-            if (loaderMethods.Length == 0)
-                return null;
-            else if (loaderMethods.Length == 1)
-                return loaderMethods[0];
-            else
-                throw new InvalidOperationException($"The type {type.ReadableName()} has more than one method marked with the {nameof(BackgroundDependencyLoader)}-Attribute. Any given type can only have one such method.");
-        }
-
-        private void register(Type type, bool lazy)
-        {
-            if (activators.ContainsKey(type))
-                throw new InvalidOperationException($@"Type {type.FullName} can not be registered twice");
-
-            var initialize = getLoaderMethod(type);
-            var constructor = type.GetConstructor(new Type[] { });
-
-            var initializerMethods = new List<MethodInfo>();
-
-            for (Type parent = type.BaseType; parent != typeof(object); parent = parent?.BaseType)
-            {
-                var init = getLoaderMethod(parent);
-                if (init != null)
-                    initializerMethods.Insert(0, init);
-            }
-            if (initialize != null)
-                initializerMethods.Add(initialize);
-
-            var initializers = initializerMethods.Select(initializer =>
-            {
-                var permitNull = initializer.GetCustomAttribute<BackgroundDependencyLoader>().PermitNulls;
-                var parameters = initializer.GetParameters().Select(p => p.ParameterType)
-                                            .Select(t => new Func<object>(() =>
-                                            {
-                                                var val = Get(t);
-                                                if (val == null && !permitNull)
-                                                {
-                                                    throw new InvalidOperationException(
-                                                        $@"Type {t.FullName} is not registered, and is a dependency of {type.FullName}");
-                                                }
-                                                return val;
-                                            })).ToList();
-                // Test that we already have all the dependencies registered
-                if (!lazy)
-                    parameters.ForEach(p => p());
-                return new Action<object>(instance =>
-                {
-                    var p = parameters.Select(pa => pa()).ToArray();
-                    initializer.Invoke(instance, p);
-                });
-            }).ToList();
-
-            activators[type] = (container, instance) =>
-            {
-                if (instance == null)
-                {
-                    if (constructor == null)
-                        throw new InvalidOperationException($@"Type {type.FullName} must have a parameterless constructor to initialize one from scratch.");
-                    instance = Activator.CreateInstance(type);
-                }
-                initializers.ForEach(init => init(instance));
-                return instance;
-            };
-        }
+        /// <summary>
+        /// Caches an instance of a type as its most derived type. This instance will be returned each time you <see cref="Get(Type)"/>.
+        /// </summary>
+        /// <param name="instance">The instance to cache.</param>
+        public void Cache(object instance)
+            => Cache(instance, default);
 
         /// <summary>
-        /// Registers a type and configures a default allocator for it that injects its
-        /// dependencies.
+        /// Caches an instance of a type as its most derived type. This instance will be returned each time you <see cref="Get(Type)"/>.
         /// </summary>
-        public void Register<T>(bool lazy = false) where T : class => register(typeof(T), lazy);
+        /// <param name="instance">The instance to cache.</param>
+        /// <param name="info">Extra information to identify <paramref name="instance"/> in the cache.</param>
+        public void Cache(object instance, CacheInfo info)
+            => CacheAs(instance.GetType(), info, instance, false);
 
         /// <summary>
-        /// Registers a type that allocates with a custom allocator.
+        /// Caches an instance of a type as a type of <typeparamref name="T"/>. This instance will be returned each time you <see cref="Get(Type)"/>.
         /// </summary>
-        public void Register<T>(Func<DependencyContainer, T> activator) where T : class
-        {
-            var type = typeof(T);
-            if (activators.ContainsKey(type))
-                throw new InvalidOperationException($@"Type {typeof(T).FullName} is already registered");
-            activators[type] = (d, i) => i ?? activator(d);
-        }
+        /// <param name="instance">The instance to cache. Must be or derive from <typeparamref name="T"/>.</param>
+        public void CacheAs<T>(T instance) where T : class
+            => CacheAs(instance, default);
 
         /// <summary>
-        /// Caches an instance of a type. This instance will be returned each time you <see cref="Get(Type)"/>.
+        /// Caches an instance of a type as a type of <typeparamref name="T"/>. This instance will be returned each time you <see cref="Get(Type)"/>.
         /// </summary>
-        public T Cache<T>(T instance = null, bool overwrite = false) where T : class
+        /// <param name="instance">The instance to cache. Must be or derive from <typeparamref name="T"/>.</param>
+        /// <param name="info">Extra information to identify <paramref name="instance"/> in the cache.</param>
+        public void CacheAs<T>(T instance, CacheInfo info) where T : class
+            => CacheAs(typeof(T), info, instance, false);
+
+        /// <summary>
+        /// Caches an instance of a type as a type of <paramref name="type"/>. This instance will be returned each time you <see cref="Get(Type)"/>.
+        /// </summary>
+        /// <param name="type">The type to cache <paramref name="instance"/> as.</param>
+        /// <param name="instance">The instance to cache. Must be or derive from <paramref name="type"/>.</param>
+        public void CacheAs<T>(Type type, T instance) where T : class
+            => CacheAs(type, instance, default);
+
+        /// <summary>
+        /// Caches an instance of a type as a type of <paramref name="type"/>. This instance will be returned each time you <see cref="Get(Type)"/>.
+        /// </summary>
+        /// <param name="type">The type to cache <paramref name="instance"/> as.</param>
+        /// <param name="instance">The instance to cache. Must be or derive from <paramref name="type"/>.</param>
+        /// <param name="info">Extra information to identify <paramref name="instance"/> in the cache.</param>
+        public void CacheAs<T>(Type type, T instance, CacheInfo info) where T : class
+            => CacheAs(type, info, instance, false);
+
+        /// <summary>
+        /// Caches an instance of a type as its most derived type. This instance will be returned each time you <see cref="DependencyContainer.Get(Type)"/>.
+        /// </summary>
+        /// <remarks>
+        /// This should only be used when it is guaranteed that the internal state of the type will remain consistent through retrieval.
+        /// (e.g. <see cref="CancellationToken"/> or reference types).
+        /// </remarks>
+        /// <param name="instance">The instance to cache.</param>
+        internal void CacheValue(object instance)
+            => CacheValue(instance, default);
+
+        /// <summary>
+        /// Caches an instance of a type as its most derived type. This instance will be returned each time you <see cref="DependencyContainer.Get(Type)"/>.
+        /// </summary>
+        /// <remarks>
+        /// This should only be used when it is guaranteed that the internal state of the type will remain consistent through retrieval.
+        /// (e.g. <see cref="CancellationToken"/> or reference types).
+        /// </remarks>
+        /// <param name="instance">The instance to cache.</param>
+        /// <param name="info">Extra information to identify <paramref name="instance"/> in the cache.</param>
+        internal void CacheValue(object instance, CacheInfo info)
         {
-            if (!overwrite && cache.ContainsKey(typeof(T)))
-                throw new InvalidOperationException($@"Type {typeof(T).FullName} is already cached");
             if (instance == null)
-                instance = this.Get<T>();
-            cacheable.Add(typeof(T));
-            cache[typeof(T)] = instance;
-            return instance;
+                return;
+            CacheAs(instance.GetType(), info, instance, true);
         }
 
         /// <summary>
-        /// Retrieves a cached dependency of <paramref name="type"/> if it exists. If not, then the parent
-        /// <see cref="IReadOnlyDependencyContainer"/> is recursively queried. If no parent contains
-        /// <paramref name="type"/>, then null is returned.
+        /// Caches an instance of a type as a type of <typeparamref name="T"/>. This instance will be returned each time you <see cref="DependencyContainer.Get(Type)"/>.
         /// </summary>
-        /// <param name="type">The dependency type to query for.</param>
-        /// <returns>The requested dependency, or null if not found.</returns>
-        public object Get(Type type)
+        /// <remarks>
+        /// This should only be used when it is guaranteed that the internal state of the type will remain consistent through retrieval.
+        /// (e.g. <see cref="CancellationToken"/> or reference types).
+        /// </remarks>
+        /// <param name="instance">The instance to cache. Must be or derive from <typeparamref name="T"/>.</param>
+        internal void CacheValueAs<T>(T instance)
+            => CacheValueAs(instance, default);
+
+        /// <summary>
+        /// Caches an instance of a type as a type of <typeparamref name="T"/>. This instance will be returned each time you <see cref="DependencyContainer.Get(Type)"/>.
+        /// </summary>
+        /// <remarks>
+        /// This should only be used when it is guaranteed that the internal state of the type will remain consistent through retrieval.
+        /// (e.g. <see cref="CancellationToken"/> or reference types).
+        /// </remarks>
+        /// <param name="instance">The instance to cache. Must be or derive from <typeparamref name="T"/>.</param>
+        /// <param name="info">Extra information to identify <paramref name="instance"/> in the cache.</param>
+        internal void CacheValueAs<T>(T instance, CacheInfo info)
+            => CacheAs(typeof(T), info, instance, true);
+
+        /// <summary>
+        /// Caches an instance of a type as a type of <paramref name="type"/>. This instance will be returned each time you <see cref="Get(Type)"/>.
+        /// </summary>
+        /// <param name="type">The type to cache <paramref name="instance"/> as.</param>
+        /// <param name="info">Extra information to identify <paramref name="instance"/> in the cache.</param>
+        /// <param name="instance">The instance to cache. Must be or derive from <paramref name="type"/>.</param>
+        /// <param name="allowValueTypes">Whether value types are allowed to be cached.
+        /// This should only be used when it is guaranteed that the internal state of the type will remain consistent through retrieval.
+        /// (e.g. <see cref="CancellationToken"/> or reference types).</param>
+        internal void CacheAs(Type type, CacheInfo info, object instance, bool allowValueTypes)
         {
-            object ret;
-            if (cache.TryGetValue(type, out ret))
-                return ret;
+            if (instance == null)
+            {
+                if (allowValueTypes)
+                    return;
+                throw new ArgumentNullException(nameof(instance));
+            }
 
-            return parentContainer?.Get(type);
+            info.Type = Nullable.GetUnderlyingType(type) ?? type;
 
-            //we don't ever want to instantiate for now, as this breaks expectations when using permitNull.
-            //need to revisit this when/if it is required.
-            //if (!activators.ContainsKey(type))
-            //    return null; // Or an exception?
-            //object instance = activators[type](this, null);
-            //if (cacheable.Contains(type))
-            //    cache[type] = instance;
-            //return instance;
+            var instanceType = instance.GetType();
+            instanceType = Nullable.GetUnderlyingType(instanceType) ?? instanceType;
+
+            if (instanceType.IsValueType && !allowValueTypes)
+                throw new ArgumentException($"{instanceType.ReadableName()} must be a class to be cached as a dependency.", nameof(instance));
+
+            if (!info.Type.IsInstanceOfType(instance))
+                throw new ArgumentException($"{instanceType.ReadableName()} must be a subclass of {info.Type.ReadableName()}.", nameof(instance));
+
+            // We can theoretically make this work by adding a nested dependency container. That would be a pretty big change though.
+            // For now, let's throw an exception as this leads to unexpected behaviours (depends on ordering of processing of attributes vs CreateChildDependencies).
+            if (cache.TryGetValue(info, out _))
+                throw new TypeAlreadyCachedException(info);
+
+            cache[info] = instance;
+        }
+
+
+        public object Get(Type type)
+            => Get(type, default);
+
+        public object Get(Type type, CacheInfo info)
+        {
+            info.Type = Nullable.GetUnderlyingType(type) ?? type;
+
+            if (cache.TryGetValue(info, out var existing))
+                return existing;
+
+            return parentContainer?.Get(type, info);
         }
 
         /// <summary>
@@ -161,24 +179,26 @@ namespace osu.Framework.Allocation
         /// </summary>
         /// <typeparam name="T">The type of the instance to inject dependencies into.</typeparam>
         /// <param name="instance">The instance to inject dependencies into.</param>
-        /// <param name="autoRegister">True if the instance should be automatically registered as injectable if it isn't already.</param>
-        /// <param name="lazy">True if the dependencies should be initialized lazily.</param>
-        public void Inject<T>(T instance, bool autoRegister = true, bool lazy = false) where T : class
+        /// <exception cref="DependencyInjectionException">When any user error has occurred.
+        /// Rethrow <see cref="DependencyInjectionException.DispatchInfo"/> when appropriate to retrieve the original exception.</exception>
+        /// <exception cref="OperationCanceledException">When the injection process was cancelled.</exception>
+        public void Inject<T>(T instance)
+            where T : class
+            => DependencyActivator.Activate(instance, this);
+
+        // See: https://docs.microsoft.com/en-us/xamarin/ios/internals/limitations#value-types-as-dictionary-keys
+        private class CachedObjectComparer : IEqualityComparer<CacheInfo>
         {
-            var type = instance.GetType();
+            public bool Equals(CacheInfo x, CacheInfo y) => x.Equals(y);
+            public int GetHashCode(CacheInfo obj) => obj.GetHashCode();
+        }
+    }
 
-            // TODO: consider using parentContainer for activator lookups as a potential performance improvement.
-
-            lock (activators)
-                if (autoRegister && !activators.ContainsKey(type))
-                    register(type, lazy);
-
-            ObjectActivator activator;
-
-            if (!activators.TryGetValue(type, out activator))
-                throw new InvalidOperationException("DI Initialisation failed badly.");
-
-            activator(this, instance);
+    public class TypeAlreadyCachedException : InvalidOperationException
+    {
+        public TypeAlreadyCachedException(CacheInfo info)
+            : base($"An instance of the member ({info.ToString()}) has already been cached to the dependency container.")
+        {
         }
     }
 }

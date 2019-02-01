@@ -1,11 +1,9 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using osu.Framework.Extensions.MatrixExtensions;
-using OpenTK;
-using OpenTK.Graphics;
-using osu.Framework.Graphics.Colour;
+using osuTK;
 using osu.Framework.Extensions.TypeExtensions;
 
 namespace osu.Framework.Graphics
@@ -14,15 +12,11 @@ namespace osu.Framework.Graphics
     {
         public Matrix3 Matrix;
         public Matrix3 MatrixInverse;
-        public ColourInfo Colour;
-        public BlendingInfo Blending;
 
-        public DrawInfo(Matrix3? matrix = null, Matrix3? matrixInverse = null, ColourInfo? colour = null, BlendingInfo? blending = null)
+        public DrawInfo(Matrix3? matrix = null, Matrix3? matrixInverse = null)
         {
             Matrix = matrix ?? Matrix3.Identity;
             MatrixInverse = matrixInverse ?? Matrix3.Identity;
-            Colour = colour ?? ColourInfo.SingleColour(Color4.White);
-            Blending = blending ?? new BlendingInfo();
         }
 
         /// <summary>
@@ -35,12 +29,6 @@ namespace osu.Framework.Graphics
         /// <param name="origin">The center of rotation and scale.</param>
         public void ApplyTransform(Vector2 translation, Vector2 scale, float rotation, Vector2 shear, Vector2 origin)
         {
-            checkComponentValid(translation, nameof(translation));
-            checkComponentValid(scale, nameof(scale));
-            checkComponentValid(rotation, nameof(rotation));
-            checkComponentValid(shear, nameof(shear));
-            checkComponentValid(origin, nameof(origin));
-
             if (translation != Vector2.Zero)
             {
                 MatrixExtensions.TranslateFromLeft(ref Matrix, translation);
@@ -80,24 +68,7 @@ namespace osu.Framework.Graphics
             //MatrixExtensions.FastInvert(ref target.MatrixInverse);
         }
 
-        private void checkComponentValid(float component, string name)
-        {
-            if (float.IsNaN(component) || float.IsInfinity(component))
-                throw new ArgumentException($"Invalid value ({component}) provided for component {name}.");
-        }
-
-        private void checkComponentValid(Vector2 component, string name)
-        {
-            if (float.IsNaN(component.X) || float.IsInfinity(component.X))
-                throw new ArgumentException($"Invalid value ({component}) provided for component {name}.X.");
-            if (float.IsNaN(component.Y) || float.IsInfinity(component.Y))
-                throw new ArgumentException($"Invalid value ({component}) provided for component {name}.Y.");
-        }
-
-        public bool Equals(DrawInfo other)
-        {
-            return Matrix.Equals(other.Matrix) && Colour.Equals(other.Colour) && Blending.Equals(other.Blending);
-        }
+        public bool Equals(DrawInfo other) => Matrix.Equals(other.Matrix);
 
         public override string ToString() => $@"{GetType().ReadableName().Replace(@"DrawInfo", string.Empty)} DrawInfo";
     }

@@ -1,20 +1,19 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using osuTK;
 
 // this is an abusive thing to do, but it increases the visibility of Extension Methods to virtually every file.
 
@@ -34,7 +33,7 @@ namespace osu.Framework.Extensions
         /// <returns>The matched item, or the default value for the type if no item was matched.</returns>
         public static T Find<T>(this List<T> list, Predicate<T> match, int startIndex)
         {
-            if (!list.IsValidIndex(startIndex)) return default(T);
+            if (!list.IsValidIndex(startIndex)) return default;
 
             int val = list.FindIndex(startIndex, list.Count - startIndex - 1, match);
 
@@ -78,8 +77,7 @@ namespace osu.Framework.Extensions
         /// <returns></returns>
         public static TValue GetOrDefault<TKey, TValue>(this Dictionary<TKey, TValue> dictionary, TKey lookup)
         {
-            TValue outVal;
-            return dictionary.TryGetValue(lookup, out outVal) ? outVal : default(TValue);
+            return dictionary.TryGetValue(lookup, out TValue outVal) ? outVal : default;
         }
 
         public static bool IsValidIndex<T>(this List<T> list, int index)
@@ -197,17 +195,8 @@ namespace osu.Framework.Extensions
 
         public static void ThrowIfFaulted(this Task task)
         {
-            if (task.IsFaulted)
-            {
-                Exception e = task.Exception;
-
-                Debug.Assert(e != null);
-
-                while (e.InnerException != null)
-                    e = e.InnerException;
-
-                ExceptionDispatchInfo.Capture(e).Throw();
-            }
+            if (!task.IsFaulted) return;
+            throw task.Exception ?? new Exception("Task failed.");
         }
 
         /// <summary>
@@ -242,6 +231,17 @@ namespace osu.Framework.Extensions
             stream.Seek(0, SeekOrigin.Begin);
 
             return hash;
+        }
+
+        public static DisplayIndex GetIndex(this DisplayDevice display)
+        {
+            if (display == null) return DisplayIndex.Default;
+            for (int i = 0; ; i++)
+            {
+                var device = DisplayDevice.GetDisplay((DisplayIndex)i);
+                if (device == null) return DisplayIndex.Default;
+                if (device == display) return (DisplayIndex)i;
+            }
         }
     }
 }

@@ -1,12 +1,12 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using ManagedBass;
 
 namespace osu.Framework.Audio.Sample
 {
-    internal class SampleChannelBass : SampleChannel, IBassAudio
+    public class SampleChannelBass : SampleChannel, IBassAudio
     {
         private volatile int channel;
         private volatile bool playing;
@@ -43,7 +43,7 @@ namespace osu.Framework.Audio.Sample
 
         public override void Play(bool restart = true)
         {
-            PendingActions.Enqueue(() =>
+            EnqueueAction(() =>
             {
                 if (!IsLoaded)
                 {
@@ -59,7 +59,7 @@ namespace osu.Framework.Audio.Sample
 
             InvalidateState();
 
-            PendingActions.Enqueue(() =>
+            EnqueueAction(() =>
             {
                 if (channel != 0)
                     Bass.ChannelPlay(channel, restart);
@@ -84,7 +84,7 @@ namespace osu.Framework.Audio.Sample
 
             base.Stop();
 
-            PendingActions.Enqueue(() =>
+            EnqueueAction(() =>
             {
                 Bass.ChannelStop(channel);
                 // ChannelStop frees the channel.

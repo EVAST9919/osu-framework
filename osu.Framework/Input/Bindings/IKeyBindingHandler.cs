@@ -1,5 +1,5 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics;
 
@@ -9,7 +9,7 @@ namespace osu.Framework.Input.Bindings
     /// A drawable that handles key bindings.
     /// </summary>
     /// <typeparam name="T">The type of bindings, commonly an enum.</typeparam>
-    public interface IKeyBindingHandler<in T> : IDrawable
+    public interface IKeyBindingHandler<in T> : IKeyBindingHandler
         where T : struct
     {
         /// <summary>
@@ -27,5 +27,9 @@ namespace osu.Framework.Input.Bindings
         /// <returns>True if this Drawable handled the event. If false, then the event
         /// is propagated up the scene graph to the next eligible Drawable.</returns>
         bool OnReleased(T action);
+    }
+
+    public interface IKeyBindingHandler : IDrawable
+    {
     }
 }

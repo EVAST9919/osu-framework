@@ -1,7 +1,8 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using osu.Framework.Logging;
 
 namespace osu.Framework.Allocation
 {
@@ -18,6 +19,18 @@ namespace osu.Framework.Allocation
         private readonly HashSet<T[]> usedDataBuffers = new HashSet<T[]>();
 
         /// <summary>
+        /// The number of buffers currently in use.
+        /// </summary>
+        public int BuffersInUse
+        {
+            get
+            {
+                lock (freeDataBuffers)
+                    return totalUsage;
+            }
+        }
+
+        /// <summary>
         /// Creates a new buffer stack containing a given maximum amount of buffers.
         /// </summary>
         /// <param name="maxAmountBuffers">The maximum amount of buffers to be contained within the buffer stack.</param>
@@ -26,9 +39,13 @@ namespace osu.Framework.Allocation
             this.maxAmountBuffers = maxAmountBuffers;
         }
 
+        private int totalUsage;
+
         private T[] findFreeBuffer(int minimumLength)
         {
             T[] buffer = null;
+
+            totalUsage++;
 
             if (freeDataBuffers.Count > 0)
                 buffer = freeDataBuffers.Pop();
@@ -39,11 +56,16 @@ namespace osu.Framework.Allocation
             if (usedDataBuffers.Count < maxAmountBuffers)
                 usedDataBuffers.Add(buffer);
 
+            if (totalUsage > maxAmountBuffers)
+                Logger.Log($"BufferStack usage exceeded allocation (usage: {totalUsage} max: {maxAmountBuffers})", LoggingTarget.Performance);
+
             return buffer;
         }
 
         private void returnFreeBuffer(T[] buffer)
         {
+            totalUsage--;
+
             if (usedDataBuffers.Remove(buffer))
                 // We are here if the element was successfully found and removed
                 freeDataBuffers.Push(buffer);

@@ -1,21 +1,20 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Caching;
 using osu.Framework.Extensions.IEnumerableExtensions;
-using OpenTK.Graphics;
+using osuTK.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Input;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Logging;
+using osu.Framework.Input.Events;
 using osu.Framework.MathUtils;
 using osu.Framework.Threading;
-using OpenTK;
-using OpenTK.Input;
+using osuTK;
+using osuTK.Input;
 
 namespace osu.Framework.Graphics.UserInterface
 {
@@ -135,7 +134,7 @@ namespace osu.Framework.Graphics.UserInterface
         /// </summary>
         public IReadOnlyList<MenuItem> Items
         {
-            get { return ItemsContainer.Select(r => r.Item).ToList(); }
+            get => ItemsContainer.Select(r => r.Item).ToList();
             set
             {
                 Clear();
@@ -148,8 +147,8 @@ namespace osu.Framework.Graphics.UserInterface
         /// </summary>
         public Color4 BackgroundColour
         {
-            get { return background.Colour; }
-            set { background.Colour = value; }
+            get => background.Colour;
+            set => background.Colour = value;
         }
 
         /// <summary>
@@ -157,8 +156,8 @@ namespace osu.Framework.Graphics.UserInterface
         /// </summary>
         public bool ScrollbarVisible
         {
-            get { return ContentContainer.ScrollbarVisible; }
-            set { ContentContainer.ScrollbarVisible = value; }
+            get => ContentContainer.ScrollbarVisible;
+            set => ContentContainer.ScrollbarVisible = value;
         }
 
         private float maxWidth = float.MaxValue;
@@ -167,7 +166,7 @@ namespace osu.Framework.Graphics.UserInterface
         /// </summary>
         public float MaxWidth
         {
-            get { return maxWidth; }
+            get => maxWidth;
             set
             {
                 if (Precision.AlmostEquals(maxWidth, value))
@@ -184,7 +183,7 @@ namespace osu.Framework.Graphics.UserInterface
         /// </summary>
         public float MaxHeight
         {
-            get { return maxHeight; }
+            get => maxHeight;
             set
             {
                 if (Precision.AlmostEquals(maxHeight, value))
@@ -201,7 +200,7 @@ namespace osu.Framework.Graphics.UserInterface
         /// </summary>
         public virtual MenuState State
         {
-            get { return state; }
+            get => state;
             set
             {
                 if (TopLevelMenu)
@@ -259,6 +258,7 @@ namespace osu.Framework.Graphics.UserInterface
             drawableItem.SetFlowDirection(Direction);
 
             ItemsContainer.Add(drawableItem);
+            sizeCache.Invalidate();
         }
 
         private void itemStateChanged(DrawableMenuItem item, MenuItemState state)
@@ -317,11 +317,11 @@ namespace osu.Framework.Graphics.UserInterface
         /// </summary>
         protected virtual void AnimateClose() => Hide();
 
-        public override void InvalidateFromChild(Invalidation invalidation)
+        public override void InvalidateFromChild(Invalidation invalidation, Drawable source = null)
         {
             if ((invalidation & Invalidation.RequiredParentSizeToFit) > 0)
                 sizeCache.Invalidate();
-            base.InvalidateFromChild(invalidation);
+            base.InvalidateFromChild(invalidation, source);
         }
 
         protected override void UpdateAfterChildren()
@@ -352,8 +352,8 @@ namespace osu.Framework.Graphics.UserInterface
                 height = Math.Min(MaxHeight, height);
 
                 // Regardless of the above result, if we are relative-sizing, just use the stored width/height
-                width = (RelativeSizeAxes & Axes.X) > 0 ? Width : width;
-                height = (RelativeSizeAxes & Axes.Y) > 0 ? Height : height;
+                width = RelativeSizeAxes.HasFlag(Axes.X) ? Width : width;
+                height = RelativeSizeAxes.HasFlag(Axes.Y) ? Height : height;
 
                 if (State == MenuState.Closed && Direction == Direction.Horizontal)
                     width = 0;
@@ -466,25 +466,25 @@ namespace osu.Framework.Graphics.UserInterface
             }
         }
 
-        protected override bool OnKeyDown(InputState state, KeyDownEventArgs args)
+        protected override bool OnKeyDown(KeyDownEvent e)
         {
-            if (args.Key == Key.Escape && !TopLevelMenu)
+            if (e.Key == Key.Escape && !TopLevelMenu)
             {
                 Close();
                 return true;
             }
 
-            return base.OnKeyDown(state, args);
+            return base.OnKeyDown(e);
         }
 
-        protected override bool OnClick(InputState state) => true;
-        protected override bool OnHover(InputState state) => true;
+        protected override bool OnClick(ClickEvent e) => true;
+        protected override bool OnHover(HoverEvent e) => true;
 
         public override bool AcceptsFocus => !TopLevelMenu;
 
         public override bool RequestsFocus => !TopLevelMenu && State == MenuState.Open;
 
-        protected override void OnFocusLost(InputState state)
+        protected override void OnFocusLost(FocusLostEvent e)
         {
             // Case where a sub-menu was opened the focus will be transferred to that sub-menu while this menu will receive OnFocusLost
             if (submenu?.State == MenuState.Open)
@@ -587,8 +587,7 @@ namespace osu.Framework.Graphics.UserInterface
                     },
                 };
 
-                var textContent = Content as IHasText;
-                if (textContent != null)
+                if (Content is IHasText textContent)
                 {
                     textContent.Text = item.Text;
                     Item.Text.ValueChanged += newText => textContent.Text = newText;
@@ -612,7 +611,7 @@ namespace osu.Framework.Graphics.UserInterface
             /// </summary>
             public Color4 BackgroundColour
             {
-                get { return backgroundColour; }
+                get => backgroundColour;
                 set
                 {
                     backgroundColour = value;
@@ -626,7 +625,7 @@ namespace osu.Framework.Graphics.UserInterface
             /// </summary>
             public Color4 ForegroundColour
             {
-                get { return foregroundColour; }
+                get => foregroundColour;
                 set
                 {
                     foregroundColour = value;
@@ -640,7 +639,7 @@ namespace osu.Framework.Graphics.UserInterface
             /// </summary>
             public Color4 BackgroundColourHover
             {
-                get { return backgroundColourHover; }
+                get => backgroundColourHover;
                 set
                 {
                     backgroundColourHover = value;
@@ -654,7 +653,7 @@ namespace osu.Framework.Graphics.UserInterface
             /// </summary>
             public Color4 ForegroundColourHover
             {
-                get { return foregroundColourHover; }
+                get => foregroundColourHover;
                 set
                 {
                     foregroundColourHover = value;
@@ -665,12 +664,10 @@ namespace osu.Framework.Graphics.UserInterface
             private MenuItemState state;
             public MenuItemState State
             {
-                get { return state; }
+                get => state;
                 set
                 {
                     state = value;
-
-                    Logger.Log($"Menu item {Item.Text} is {state}");
 
                     UpdateForegroundColour();
                     UpdateBackgroundColour();
@@ -712,7 +709,7 @@ namespace osu.Framework.Graphics.UserInterface
                 Foreground.Colour = ForegroundColour;
             }
 
-            protected override bool OnHover(InputState state)
+            protected override bool OnHover(HoverEvent e)
             {
                 UpdateBackgroundColour();
                 UpdateForegroundColour();
@@ -726,16 +723,16 @@ namespace osu.Framework.Graphics.UserInterface
                 return false;
             }
 
-            protected override void OnHoverLost(InputState state)
+            protected override void OnHoverLost(HoverLostEvent e)
             {
                 UpdateBackgroundColour();
                 UpdateForegroundColour();
-                base.OnHoverLost(state);
+                base.OnHoverLost(e);
             }
 
             private bool hasSubmenu => Item.Items?.Count > 0;
 
-            protected override bool OnClick(InputState state)
+            protected override bool OnClick(ClickEvent e)
             {
                 if (Item.Action.Disabled)
                     return true;

@@ -1,14 +1,16 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Extensions.TypeExtensions;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Newtonsoft.Json;
+using osu.Framework.IO.Serialization;
 
 namespace osu.Framework.Lists
 {
-    public class SortedList<T> : ICollection<T>, IReadOnlyList<T>
+    public class SortedList<T> : ICollection<T>, IReadOnlyList<T>, ISerializableSortedList
     {
         private readonly List<T> list;
 
@@ -20,14 +22,31 @@ namespace osu.Framework.Lists
 
         public T this[int index]
         {
-            get { return list[index]; }
-            set { list[index] = value; }
+            get => list[index];
+            set => list[index] = value;
         }
 
-        public SortedList(Func<T, T, int> comparer) : this(new ComparisonComparer<T>(comparer))
+        /// <summary>
+        /// Constructs a new <see cref="SortedList{T}"/> with the default <typeparamref name="T"/> comparer.
+        /// </summary>
+        public SortedList()
+            : this(Comparer<T>.Default)
         {
         }
 
+        /// <summary>
+        /// Constructs a new <see cref="SortedList{T}"/> with a custom comparison function.
+        /// </summary>
+        /// <param name="comparer">The comparison function.</param>
+        public SortedList(Func<T, T, int> comparer)
+            : this(new ComparisonComparer<T>(comparer))
+        {
+        }
+
+        /// <summary>
+        /// Constructs a new <see cref="SortedList{T}"/> with a custom <see cref="IComparer{T}"/>.
+        /// </summary>
+        /// <param name="comparer">The comparer to use.</param>
         public SortedList(IComparer<T> comparer)
         {
             list = new List<T>();
@@ -90,11 +109,7 @@ namespace osu.Framework.Lists
 
         public int BinarySearch(T value) => list.BinarySearch(value, Comparer);
 
-        public int IndexOf(T value)
-        {
-            int index = list.BinarySearch(value, Comparer);
-            return index >= 0 && list[index].Equals(value) ? index : -1;
-        }
+        public int IndexOf(T value) => list.BinarySearch(value, Comparer);
 
         public void CopyTo(T[] array, int arrayIndex) => list.CopyTo(array, arrayIndex);
 
@@ -112,28 +127,47 @@ namespace osu.Framework.Lists
 
         void ICollection<T>.Add(T item) => Add(item);
 
-        public IEnumerator<T> GetEnumerator() => list.GetEnumerator();
+        public Enumerator GetEnumerator() => new Enumerator(this);
 
-        IEnumerator IEnumerable.GetEnumerator() => list.GetEnumerator();
+        IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        void ISerializableSortedList.SerializeTo(JsonWriter writer, JsonSerializer serializer)
+        {
+            serializer.Serialize(writer, list);
+        }
+
+        void ISerializableSortedList.DeserializeFrom(JsonReader reader, JsonSerializer serializer)
+        {
+            serializer.Populate(reader, list);
+            list.Sort(Comparer);
+        }
 
         #endregion
 
-        private class ComparisonComparer<TComparison> : IComparer<TComparison>
+        public struct Enumerator : IEnumerator<T>
         {
-            private readonly Comparison<TComparison> comparison;
+            private SortedList<T> list;
+            private int currentIndex;
 
-            public ComparisonComparer(Func<TComparison, TComparison, int> compare)
+            internal Enumerator(SortedList<T> list)
             {
-                if (compare == null)
-                {
-                    throw new ArgumentNullException(nameof(compare));
-                }
-                comparison = new Comparison<TComparison>(compare);
+                this.list = list;
+                currentIndex = -1; // The first MoveNext() should bring the iterator to 0
             }
 
-            public int Compare(TComparison x, TComparison y)
+            public bool MoveNext() => ++currentIndex < list.Count;
+
+            public void Reset() => currentIndex = -1;
+
+            public T Current => list[currentIndex];
+
+            object IEnumerator.Current => Current;
+
+            public void Dispose()
             {
-                return comparison(x, y);
+                list = null;
             }
         }
     }

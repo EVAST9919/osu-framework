@@ -1,31 +1,26 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
 using osu.Framework.Graphics.OpenGL.Textures;
-using OpenTK;
-using OpenTK.Graphics.ES30;
+using osu.Framework.Graphics.Textures;
+using osuTK;
+using osuTK.Graphics.ES30;
 
 namespace osu.Framework.Graphics.OpenGL.Buffers
 {
     public class FrameBuffer : IDisposable
     {
-        private int lastFramebuffer;
         private int frameBuffer = -1;
 
         public TextureGL Texture { get; private set; }
-
-        private bool isBound => lastFramebuffer != -1;
 
         private readonly List<RenderBuffer> attachedRenderBuffers = new List<RenderBuffer>();
 
         #region Disposal
 
-        ~FrameBuffer()
-        {
-            Dispose(false);
-        }
+        ~FrameBuffer() => Dispose(false);
 
         public void Dispose()
         {
@@ -43,7 +38,6 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
 
             GLWrapper.ScheduleDisposal(delegate
             {
-                Unbind();
                 GLWrapper.DeleteFramebuffer(frameBuffer);
                 frameBuffer = -1;
             });
@@ -60,7 +54,7 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
             if (withTexture)
             {
                 Texture = new TextureGLSingle(1, 1, true, filteringMode);
-                Texture.SetData(new TextureUpload(Array.Empty<byte>()));
+                Texture.SetData(new TextureUpload());
                 Texture.Upload();
 
                 Bind();
@@ -77,11 +71,11 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
         private Vector2 size = Vector2.One;
 
         /// <summary>
-        /// Sets the size of the texture of this framebuffer.
+        /// Sets the size of the texture of this frame buffer.
         /// </summary>
         public Vector2 Size
         {
-            get { return size; }
+            get => size;
             set
             {
                 if (value == size)
@@ -90,7 +84,7 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
 
                 Texture.Width = (int)Math.Ceiling(size.X);
                 Texture.Height = (int)Math.Ceiling(size.Y);
-                Texture.SetData(new TextureUpload(Array.Empty<byte>()));
+                Texture.SetData(new TextureUpload());
                 Texture.Upload();
             }
         }
@@ -113,14 +107,7 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
         /// </summary>
         public void Bind()
         {
-            if (frameBuffer == -1)
-                return;
-
-            if (lastFramebuffer == frameBuffer)
-                return;
-
-            // Bind framebuffer and all its renderbuffers
-            lastFramebuffer = GLWrapper.BindFrameBuffer(frameBuffer);
+            GLWrapper.BindFrameBuffer(frameBuffer);
             foreach (var r in attachedRenderBuffers)
             {
                 r.Size = Size;
@@ -133,14 +120,9 @@ namespace osu.Framework.Graphics.OpenGL.Buffers
         /// </summary>
         public void Unbind()
         {
-            if (!isBound)
-                return;
-
-            GLWrapper.BindFrameBuffer(lastFramebuffer);
+            GLWrapper.UnbindFrameBuffer(frameBuffer);
             foreach (var r in attachedRenderBuffers)
                 r.Unbind();
-
-            lastFramebuffer = -1;
         }
     }
 }

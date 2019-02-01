@@ -1,11 +1,12 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Concurrent;
 using System.IO;
 using osu.Framework.IO.Stores;
 using osu.Framework.Statistics;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace osu.Framework.Audio.Sample
 {
@@ -15,6 +16,11 @@ namespace osu.Framework.Audio.Sample
 
         private readonly ConcurrentDictionary<string, Sample> sampleCache = new ConcurrentDictionary<string, Sample>();
 
+        /// <summary>
+        /// How many instances of a single sample should be allowed to playback concurrently before stopping the longest playing.
+        /// </summary>
+        public int PlaybackConcurrency { get; set; } = Sample.DEFAULT_CONCURRENCY;
+
         public SampleManager(IResourceStore<byte[]> store)
         {
             this.store = store;
@@ -22,15 +28,15 @@ namespace osu.Framework.Audio.Sample
 
         public SampleChannel Get(string name)
         {
+            if (string.IsNullOrEmpty(name)) return null;
+
             lock (sampleCache)
             {
-                Sample sample;
                 SampleChannel channel = null;
-                if (!sampleCache.TryGetValue(name, out sample))
+                if (!sampleCache.TryGetValue(name, out Sample sample))
                 {
                     byte[] data = store.Get(name);
-                    if (data != null)
-                        sample = sampleCache[name] = new SampleBass(data, PendingActions);
+                    sample = sampleCache[name] = data == null ? null : new SampleBass(data, PendingActions, PlaybackConcurrency);
                 }
 
                 if (sample != null)
@@ -42,6 +48,8 @@ namespace osu.Framework.Audio.Sample
                 return channel;
             }
         }
+
+        public Task<SampleChannel> GetAsync(string name) => Task.Run(() => Get(name));
 
         public override void UpdateDevice(int deviceIndex)
         {

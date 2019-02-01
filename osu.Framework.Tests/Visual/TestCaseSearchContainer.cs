@@ -1,23 +1,19 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Testing;
-using OpenTK;
+using osuTK;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCaseSearchContainer : TestCase
+    public class TestCaseSearchContainer : TestCase
     {
-        public override string Description => "Tests the SearchContainer";
-
         public TestCaseSearchContainer()
         {
             SearchContainer<HeaderContainer> search;
@@ -66,15 +62,15 @@ namespace osu.Framework.Tests.Visual
                                             AutoSizeAxes = Axes.Both,
                                             Children = new []
                                             {
-                                                new KeywordText
+                                                new SpriteText
                                                 {
                                                     Text = "multi",
                                                 },
-                                                new KeywordText
+                                                new SpriteText
                                                 {
                                                     Text = "piece",
                                                 },
-                                                new KeywordText
+                                                new SpriteText
                                                 {
                                                     Text = "container",
                                                 },
@@ -162,11 +158,6 @@ namespace osu.Framework.Tests.Visual
             }
         }
 
-        private class KeywordText : SpriteText, IHasFilterTerms
-        {
-            public IEnumerable<string> FilterTerms => new[] { Text };
-        }
-
         private class FilterableFlowContainer : FillFlowContainer, IFilterable
         {
             public IEnumerable<string> FilterTerms => Children.OfType<IHasFilterTerms>().SelectMany(d => d.FilterTerms);
@@ -185,8 +176,6 @@ namespace osu.Framework.Tests.Visual
 
         private class SearchableText : SpriteText, IFilterable
         {
-            public IEnumerable<string> FilterTerms => new[] { Text };
-
             public bool MatchingFilter
             {
                 set

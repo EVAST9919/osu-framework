@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Concurrent;
@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Text;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
-using OpenTK.Graphics.ES30;
+using osuTK.Graphics.ES30;
 
 namespace osu.Framework.Graphics.Shaders
 {
@@ -16,7 +16,7 @@ namespace osu.Framework.Graphics.Shaders
         private const string shader_prefix = @"sh_";
 
         private readonly ConcurrentDictionary<string, ShaderPart> partCache = new ConcurrentDictionary<string, ShaderPart>();
-        private readonly ConcurrentDictionary<string, Shader> shaderCache = new ConcurrentDictionary<string, Shader>();
+        private readonly ConcurrentDictionary<(string, string), Shader> shaderCache = new ConcurrentDictionary<(string, string), Shader>();
 
         private readonly ResourceStore<byte[]> store;
 
@@ -54,8 +54,7 @@ namespace osu.Framework.Graphics.Shaders
         {
             name = ensureValidName(name, type);
 
-            ShaderPart part;
-            if (!bypassCache && partCache.TryGetValue(name, out part))
+            if (!bypassCache && partCache.TryGetValue(name, out ShaderPart part))
                 return part;
 
             byte[] rawData = LoadRaw(name);
@@ -69,33 +68,30 @@ namespace osu.Framework.Graphics.Shaders
 
         public Shader Load(string vertex, string fragment, bool continuousCompilation = false)
         {
-            string name = vertex + '/' + fragment;
+            var tuple = (vertex, fragment);
 
-            Shader shader;
+            if (shaderCache.TryGetValue(tuple, out Shader shader))
+                return shader;
 
-            if (!shaderCache.TryGetValue(name, out shader))
+            List<ShaderPart> parts = new List<ShaderPart>
             {
-                List<ShaderPart> parts = new List<ShaderPart>
-                {
-                    createShaderPart(vertex, ShaderType.VertexShader),
-                    createShaderPart(fragment, ShaderType.FragmentShader)
-                };
+                createShaderPart(vertex, ShaderType.VertexShader),
+                createShaderPart(fragment, ShaderType.FragmentShader)
+            };
 
-                shader = new Shader(name, parts);
+            shader = new Shader($"{vertex}/{fragment}", parts);
 
-                if (!shader.Loaded)
-                {
-                    StringBuilder logContents = new StringBuilder();
-                    logContents.AppendLine($@"Loading shader {name}:");
-                    logContents.Append(shader.Log);
-                    logContents.AppendLine(@"Parts:");
-                    foreach (ShaderPart p in parts)
-                        logContents.Append(p.Log);
-                    Logger.Log(logContents.ToString(), LoggingTarget.Runtime, LogLevel.Debug);
-                }
-
-                shaderCache[name] = shader;
+            if (!shader.Loaded)
+            {
+                StringBuilder logContents = new StringBuilder();
+                logContents.AppendLine($@"Loading shader {vertex}/{fragment}");
+                logContents.Append(shader.Log);
+                foreach (ShaderPart p in parts)
+                    logContents.Append(p.Log);
+                Logger.Log(logContents.ToString().Trim('\n'), LoggingTarget.Runtime, LogLevel.Debug);
             }
+
+            shaderCache[tuple] = shader;
 
             return shader;
         }

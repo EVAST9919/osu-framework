@@ -2,63 +2,46 @@
     // See https://go.microsoft.com/fwlink/?LinkId=733558
     // for the documentation about the tasks.json format
     "version": "2.0.0",
-    "command": "msbuild",
-    "type": "shell",
-    "suppressTaskName": true,
-    "args": [
-        "/property:GenerateFullPaths=true",
-        "/property:DebugType=portable",
-        "/verbosity:minimal",
-        "/m" //parallel compiling support.
-    ],
-    "tasks": [{
-            "taskName": "Build (Debug)",
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "problemMatcher": [
-                "$msCompile"
-            ]
-        },
+    "tasks": [
         {
-            "taskName": "Build (Release)",
+            "label": "Build (Debug)",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "--no-restore",
+                "/p:GenerateFullPaths=true",
+                "/m",
+                "/verbosity:m",
+                "osu-framework.sln"
+            ],
             "group": "build",
-            "args": [
-                "/property:Configuration=Release"
-            ],
-            "problemMatcher": [
-                "$msCompile"
-            ]
+            "problemMatcher": "$msCompile"
         },
         {
-            "taskName": "Clean (Debug)",
+            "label": "Build (Release)",
+            "type": "shell",
+            "command": "dotnet",
             "args": [
-                "/target:Clean"
+                "build",
+                "--no-restore",
+                "/p:Configuration=Release",
+                "/p:GenerateFullPaths=true",
+                "/m",
+                "/verbosity:m",
+                "osu-framework.sln"
             ],
-            "problemMatcher": [
-                "$msCompile"
-            ]
+            "group": "build",
+            "problemMatcher": "$msCompile"
         },
         {
-            "taskName": "Clean (Release)",
+            "label": "Restore",
+            "type": "shell",
+            "command": "dotnet",
             "args": [
-                "/target:Clean",
-                "/property:Configuration=Release"
+                "restore"
             ],
-            "problemMatcher": [
-                "$msCompile"
-            ]
-        },
-        {
-            "taskName": "Clean All",
-            "dependsOn": [
-                "Clean (Debug)",
-                "Clean (Release)"
-            ],
-            "problemMatcher": [
-                "$msCompile"
-            ]
+            "problemMatcher": []
         }
     ]
 }

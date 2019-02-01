@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Threading.Tasks;
@@ -17,15 +17,11 @@ namespace osu.Framework.Platform
             this.host.MessageReceived += handleMessage;
         }
 
-        public async Task SendMessageAsync(T message)
+        public Task SendMessageAsync(T message) => host.SendMessageAsync(new IpcMessage
         {
-            var msg = new IpcMessage
-            {
-                Type = typeof(T).AssemblyQualifiedName,
-                Value = message,
-            };
-            await host.SendMessageAsync(msg);
-        }
+            Type = typeof(T).AssemblyQualifiedName,
+            Value = message,
+        });
 
         private void handleMessage(IpcMessage message)
         {

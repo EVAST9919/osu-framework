@@ -1,34 +1,39 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
 using System.Text;
 using osu.Framework.Graphics.OpenGL;
-using OpenTK.Graphics.ES30;
+using osuTK;
+using osuTK.Graphics.ES30;
 
 namespace osu.Framework.Graphics.Shaders
 {
     public class Shader : IDisposable
     {
         internal StringBuilder Log = new StringBuilder();
-        internal bool Loaded;
+
+        /// <summary>
+        /// Whether this shader has been loaded and compiled.
+        /// </summary>
+        public bool Loaded { get; private set; }
+
         internal bool IsBound;
 
         private readonly string name;
         private int programID = -1;
 
-        private static readonly List<Shader> all_shaders = new List<Shader>();
-        private static readonly Dictionary<string, object> global_properties = new Dictionary<string, object>();
-
-        private readonly Dictionary<string, UniformBase> uniforms = new Dictionary<string, UniformBase>();
-        private UniformBase[] uniformsArray;
+        internal readonly Dictionary<string, IUniform> Uniforms = new Dictionary<string, IUniform>();
+        private IUniform[] uniformsArray;
         private readonly List<ShaderPart> parts;
 
         internal Shader(string name, List<ShaderPart> parts)
         {
             this.name = name;
             this.parts = parts;
+
+            GLWrapper.EnqueueShaderCompile(this);
         }
 
         #region Disposal
@@ -53,7 +58,7 @@ namespace osu.Framework.Graphics.Shaders
                 GLWrapper.DeleteProgram(this);
                 Loaded = false;
                 programID = -1;
-                all_shaders.Remove(this);
+                GlobalPropertyManager.Unregister(this);
             }
         }
 
@@ -62,7 +67,7 @@ namespace osu.Framework.Graphics.Shaders
         internal void Compile()
         {
             parts.RemoveAll(p => p == null);
-            uniforms.Clear();
+            Uniforms.Clear();
             uniformsArray = null;
             Log.Clear();
 
@@ -78,14 +83,13 @@ namespace osu.Framework.Graphics.Shaders
                 if (!p.Compiled) p.Compile();
                 GL.AttachShader(this, p);
 
-                foreach (AttributeInfo attribute in p.Attributes)
-                    GL.BindAttribLocation(this, attribute.Location, attribute.Name);
+                foreach (ShaderInputInfo input in p.ShaderInputs)
+                    GL.BindAttribLocation(this, input.Location, input.Name);
             }
 
             GL.LinkProgram(this);
 
-            int linkResult;
-            GL.GetProgram(this, GetProgramParameterName.LinkStatus, out linkResult);
+            GL.GetProgram(this, GetProgramParameterName.LinkStatus, out int linkResult);
             string linkLog = GL.GetProgramInfoLog(this);
 
             Log.AppendLine(string.Format(ShaderPart.BOUNDARY, name));
@@ -103,35 +107,63 @@ namespace osu.Framework.Graphics.Shaders
 
             if (Loaded)
             {
-                //Obtain all the shader uniforms
-                int uniformCount;
-                GL.GetProgram(this, GetProgramParameterName.ActiveUniforms, out uniformCount);
-                uniformsArray = new UniformBase[uniformCount];
+                // Obtain all the shader uniforms
+                GL.GetProgram(this, GetProgramParameterName.ActiveUniforms, out int uniformCount);
+                uniformsArray = new IUniform[uniformCount];
 
                 for (int i = 0; i < uniformCount; i++)
                 {
-                    int size;
-                    int length;
-                    ActiveUniformType type;
-                    string uniformName;
-                    GL.GetActiveUniform(this, i, 100, out length, out size, out type, out uniformName);
+                    GL.GetActiveUniform(this, i, 100, out _, out _, out ActiveUniformType type, out string uniformName);
 
-                    uniformsArray[i] = new UniformBase(this, uniformName, GL.GetUniformLocation(this, uniformName), type);
-                    uniforms.Add(uniformName, uniformsArray[i]);
+                    IUniform createUniform<T>(string name)
+                        where T : struct
+                    {
+                        int location = GL.GetUniformLocation(this, name);
+
+                        if (GlobalPropertyManager.CheckGlobalExists(name)) return new GlobalUniform<T>(this, name, location);
+                        return new Uniform<T>(this, name, location);
+                    }
+
+                    IUniform uniform;
+                    switch (type)
+                    {
+                        case ActiveUniformType.Bool:
+                            uniform = createUniform<bool>(uniformName);
+                            break;
+                        case ActiveUniformType.Float:
+                            uniform = createUniform<float>(uniformName);
+                            break;
+                        case ActiveUniformType.Int:
+                            uniform = createUniform<int>(uniformName);
+                            break;
+                        case ActiveUniformType.FloatMat3:
+                            uniform = createUniform<Matrix3>(uniformName);
+                            break;
+                        case ActiveUniformType.FloatMat4:
+                            uniform = createUniform<Matrix4>(uniformName);
+                            break;
+                        case ActiveUniformType.FloatVec2:
+                            uniform = createUniform<Vector2>(uniformName);
+                            break;
+                        case ActiveUniformType.FloatVec3:
+                            uniform = createUniform<Vector3>(uniformName);
+                            break;
+                        case ActiveUniformType.FloatVec4:
+                            uniform = createUniform<Vector4>(uniformName);
+                            break;
+                        default:
+                            continue;
+                    }
+
+                    uniformsArray[i] = uniform;
+                    Uniforms.Add(uniformName, uniformsArray[i]);
                 }
 
-                foreach (KeyValuePair<string, object> kvp in global_properties)
-                {
-                    if (!uniforms.ContainsKey(kvp.Key))
-                        continue;
-                    uniforms[kvp.Key].Value = kvp.Value;
-                }
-
-                all_shaders.Add(this);
+                GlobalPropertyManager.Register(this);
             }
         }
 
-        private void ensureLoaded()
+        internal void EnsureLoaded()
         {
             if (!Loaded)
                 Compile();
@@ -142,13 +174,12 @@ namespace osu.Framework.Graphics.Shaders
             if (IsBound)
                 return;
 
-            ensureLoaded();
+            EnsureLoaded();
 
             GLWrapper.UseProgram(this);
 
             foreach (var uniform in uniformsArray)
-                if (uniform.HasChanged)
-                    uniform.Update();
+                uniform?.Update();
 
             IsBound = true;
         }
@@ -171,29 +202,11 @@ namespace osu.Framework.Graphics.Shaders
         /// <param name="name">The name of the uniform.</param>
         /// <returns>Returns a base uniform.</returns>
         public Uniform<T> GetUniform<T>(string name)
+            where T : struct
         {
-            ensureLoaded();
-            if (!uniforms.ContainsKey(name))
-                throw new ArgumentException($"Uniform {name} does not exist in shader {this.name}.", nameof(name));
-            return new Uniform<T>(uniforms[name]);
-        }
+            EnsureLoaded();
 
-        /// <summary>
-        /// Sets a uniform for all shaders that contain this property.
-        /// <para>Any future-initialized shaders will also have this uniform set.</para>
-        /// </summary>
-        /// <param name="name">The uniform name.</param>
-        /// <param name="value">The uniform value.</param>
-        public static void SetGlobalProperty(string name, object value)
-        {
-            global_properties[name] = value;
-
-            foreach (Shader shader in all_shaders)
-            {
-                shader.ensureLoaded();
-                if (shader.uniforms.ContainsKey(name))
-                    shader.uniforms[name].Value = value;
-            }
+            return (Uniform<T>)Uniforms[name];
         }
 
         public static implicit operator int(Shader shader)

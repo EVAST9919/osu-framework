@@ -1,19 +1,16 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.MathUtils;
-using System.Collections.Generic;
 using System;
+using System.Collections.Concurrent;
 using System.Reflection.Emit;
 using osu.Framework.Extensions.TypeExtensions;
 using System.Reflection;
-using System.Linq;
 using System.Diagnostics;
 
 namespace osu.Framework.Graphics.Transforms
 {
-    public delegate TValue InterpolationFunc<TValue>(double time, TValue startValue, TValue endValue, double startTime, double endTime, Easing easingType);
-
     /// <summary>
     /// A transform which operates on arbitrary fields or properties of a given target.
     /// </summary>
@@ -30,22 +27,12 @@ namespace osu.Framework.Graphics.Transforms
             public WriteFunc Write;
         }
 
-        private static readonly Dictionary<string, Accessor> accessors = new Dictionary<string, Accessor>();
-        private static readonly InterpolationFunc<TValue> interpolation_func;
-
-        static TransformCustom()
-        {
-            interpolation_func =
-                (InterpolationFunc<TValue>)typeof(Interpolation).GetMethod(
-                    nameof(Interpolation.ValueAt),
-                    typeof(InterpolationFunc<TValue>)
-                        .GetMethod(nameof(InterpolationFunc<TValue>.Invoke))
-                        .GetParameters().Select(p => p.ParameterType).ToArray()
-                )?.CreateDelegate(typeof(InterpolationFunc<TValue>));
-        }
+        private static readonly ConcurrentDictionary<string, Accessor> accessors = new ConcurrentDictionary<string, Accessor>();
 
         private static ReadFunc createFieldGetter(FieldInfo field)
         {
+            if (!RuntimeInfo.SupportsJIT) return transformable => (TValue)field.GetValue(transformable);
+
             string methodName = $"{typeof(T).ReadableName()}.{field.Name}.get_{Guid.NewGuid():N}";
             DynamicMethod setterMethod = new DynamicMethod(methodName, typeof(TValue), new[] { typeof(T) }, true);
             ILGenerator gen = setterMethod.GetILGenerator();
@@ -57,6 +44,8 @@ namespace osu.Framework.Graphics.Transforms
 
         private static WriteFunc createFieldSetter(FieldInfo field)
         {
+            if (!RuntimeInfo.SupportsJIT) return (transformable, value) => field.SetValue(transformable, value);
+
             string methodName = $"{typeof(T).ReadableName()}.{field.Name}.set_{Guid.NewGuid():N}";
             DynamicMethod setterMethod = new DynamicMethod(methodName, null, new[] { typeof(T), typeof(TValue) }, true);
             ILGenerator gen = setterMethod.GetILGenerator();
@@ -65,6 +54,18 @@ namespace osu.Framework.Graphics.Transforms
             gen.Emit(OpCodes.Stfld, field);
             gen.Emit(OpCodes.Ret);
             return (WriteFunc)setterMethod.CreateDelegate(typeof(WriteFunc));
+        }
+
+        private static ReadFunc createPropertyGetter(MethodInfo getter)
+        {
+            if (!RuntimeInfo.SupportsJIT) return transformable => (TValue)getter.Invoke(transformable, new object[0]);
+            return (ReadFunc)getter.CreateDelegate(typeof(ReadFunc));
+        }
+
+        private static WriteFunc createPropertySetter(MethodInfo setter)
+        {
+            if (!RuntimeInfo.SupportsJIT) return (transformable, value) => setter.Invoke(transformable, new object[]{ value });
+            return (WriteFunc)setter.CreateDelegate(typeof(WriteFunc));
         }
 
         private static Accessor findAccessor(Type type, string propertyOrFieldName)
@@ -91,8 +92,8 @@ namespace osu.Framework.Graphics.Transforms
 
                 return new Accessor
                 {
-                    Read = (ReadFunc)getter.CreateDelegate(typeof(ReadFunc)),
-                    Write = (WriteFunc)setter.CreateDelegate(typeof(WriteFunc)),
+                    Read = createPropertyGetter(getter),
+                    Write = createPropertySetter(setter),
                 };
             }
 
@@ -122,16 +123,7 @@ namespace osu.Framework.Graphics.Transforms
             return findAccessor(type.BaseType, propertyOrFieldName);
         }
 
-        private static Accessor getAccessor(string propertyOrFieldName)
-        {
-            Accessor result;
-            if (accessors.TryGetValue(propertyOrFieldName, out result))
-                return result;
-
-            result = findAccessor(typeof(T), propertyOrFieldName);
-            accessors.Add(propertyOrFieldName, result);
-            return result;
-        }
+        private static Accessor getAccessor(string propertyOrFieldName) => accessors.GetOrAdd(propertyOrFieldName, _ => findAccessor(typeof(T), propertyOrFieldName));
 
         private readonly Accessor accessor;
         private readonly InterpolationFunc<TValue> interpolationFunc;
@@ -161,7 +153,7 @@ namespace osu.Framework.Graphics.Transforms
             accessor = getAccessor(propertyOrFieldName);
             Trace.Assert(accessor.Read != null && accessor.Write != null, $"Failed to populate {nameof(accessor)}.");
 
-            this.interpolationFunc = interpolationFunc ?? interpolation_func;
+            this.interpolationFunc = interpolationFunc ?? Interpolation<TValue>.ValueAt;
 
             if (this.interpolationFunc == null)
                 throw new InvalidOperationException(

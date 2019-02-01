@@ -1,9 +1,9 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
-using OpenTK;
+using osuTK;
 using System.Linq;
 using osu.Framework.MathUtils;
 
@@ -55,7 +55,7 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public FillDirection Direction
         {
-            get { return direction; }
+            get => direction;
             set
             {
                 if (direction == value)
@@ -73,7 +73,7 @@ namespace osu.Framework.Graphics.Containers
         /// </summary>
         public Vector2 Spacing
         {
-            get { return spacing; }
+            get => spacing;
             set
             {
                 if (spacing == value)
@@ -87,9 +87,9 @@ namespace osu.Framework.Graphics.Containers
         private Vector2 spacingFactor(Drawable c)
         {
             Vector2 result = c.RelativeOriginPosition;
-            if ((c.Anchor & Anchor.x2) > 0)
+            if (c.Anchor.HasFlag(Anchor.x2))
                 result.X = 1 - result.X;
-            if ((c.Anchor & Anchor.y2) > 0)
+            if (c.Anchor.HasFlag(Anchor.y2))
                 result.Y = 1 - result.Y;
             return result;
         }
@@ -103,8 +103,8 @@ namespace osu.Framework.Graphics.Containers
 
                 // If we are autosize and haven't specified a maximum size, we should allow infinite expansion.
                 // If we are inheriting then we need to use the parent size (our ActualSize).
-                max.X = (AutoSizeAxes & Axes.X) > 0 ? float.MaxValue : s.X;
-                max.Y = (AutoSizeAxes & Axes.Y) > 0 ? float.MaxValue : s.Y;
+                max.X = AutoSizeAxes.HasFlag(Axes.X) ? float.MaxValue : s.X;
+                max.Y = AutoSizeAxes.HasFlag(Axes.Y) ? float.MaxValue : s.Y;
             }
 
             var children = FlowingChildren.ToArray();
@@ -132,6 +132,32 @@ namespace osu.Framework.Graphics.Containers
             {
                 Drawable c = children[i];
 
+                Axes toAxes(FillDirection direction)
+                {
+                    switch (direction)
+                    {
+                        case FillDirection.Full:
+                            return Axes.Both;
+                        case FillDirection.Horizontal:
+                            return Axes.X;
+                        case FillDirection.Vertical:
+                            return Axes.Y;
+                        default:
+                            throw new ArgumentException($"{direction.ToString()} is not defined");
+                    }
+                }
+
+                // In some cases (see the right hand side of the conditional) we want to permit relatively sized children
+                // in our fill direction; specifically, when children use FillMode.Fit to preserve the aspect ratio.
+                // Consider the following use case: A fill flow container has a fixed width but an automatic height, and fills
+                // in the vertical direction. Now, we can add relatively sized children with FillMode.Fit to make sure their
+                // aspect ratio is preserved while still allowing them to fill vertically. This special case can not result
+                // in an autosize-related feedback loop, and we can thus simply allow it.
+                if ((c.RelativeSizeAxes & AutoSizeAxes & toAxes(Direction)) != 0 && (c.FillMode != FillMode.Fit || c.RelativeSizeAxes != Axes.Both || c.Size.X > RelativeChildSize.X || c.Size.Y > RelativeChildSize.Y || AutoSizeAxes == Axes.Both))
+                    throw new InvalidOperationException(
+                        "Drawables inside a fill flow container may not have a relative size axis that the fill flow container is filling in and auto sizing for." +
+                        $"The fill flow container is set to flow in the {Direction} direction and autosize in {AutoSizeAxes} axes and the child is set to relative size in {c.RelativeSizeAxes} axes.");
+
                 // Populate running variables with sane initial values.
                 if (i == 0)
                 {
@@ -142,7 +168,7 @@ namespace osu.Framework.Graphics.Containers
                 float rowWidth = rowBeginOffset + current.X + (1 - spacingFactor(c).X) * size.X;
 
                 //We've exceeded our allowed width, move to a new row
-                if (direction != FillDirection.Horizontal && (Precision.DefinitelyBigger(rowWidth, max.X) || direction == FillDirection.Vertical))
+                if (direction != FillDirection.Horizontal && (Precision.DefinitelyBigger(rowWidth, max.X) || direction == FillDirection.Vertical || ForceNewRow(c)))
                 {
                     current.X = 0;
                     current.Y += rowHeight;
@@ -217,27 +243,34 @@ namespace osu.Framework.Graphics.Containers
                         break;
                 }
 
-                if ((c.Anchor & Anchor.x1) > 0)
+                if (c.Anchor.HasFlag(Anchor.x1))
                     // Begin flow at centre of row
                     result[i].X += rowOffsetsToMiddle[rowIndices[i]];
-                else if ((c.Anchor & Anchor.x2) > 0)
+                else if (c.Anchor.HasFlag(Anchor.x2))
                     // Flow right-to-left
                     result[i].X = -result[i].X;
 
-                if ((c.Anchor & Anchor.y1) > 0)
+                if (c.Anchor.HasFlag(Anchor.y1))
                     // Begin flow at centre of total height
                     result[i].Y -= height / 2;
-                else if ((c.Anchor & Anchor.y2) > 0)
+                else if (c.Anchor.HasFlag(Anchor.y2))
                     // Flow bottom-to-top
                     result[i].Y = -result[i].Y;
             }
 
             return result;
         }
+
+        /// <summary>
+        /// Returns true if the given child should be placed on a new row, false otherwise. This will be called automatically for each child in this FillFlowContainers FlowingChildren-List.
+        /// </summary>
+        /// <param name="child">The child to check.</param>
+        /// <returns>True if the given child should be placed on a new row, false otherwise.</returns>
+        protected virtual bool ForceNewRow(Drawable child) => false;
     }
 
     /// <summary>
-    /// Represents the horizontal direction of a fill flow.
+    /// Represents the direction children of a <see cref="FillFlowContainer{T}"/> should be filled in.
     /// </summary>
     public enum FillDirection
     {
@@ -254,6 +287,6 @@ namespace osu.Framework.Graphics.Containers
         /// <summary>
         /// Fill only vertically.
         /// </summary>
-        Vertical,
+        Vertical
     }
 }

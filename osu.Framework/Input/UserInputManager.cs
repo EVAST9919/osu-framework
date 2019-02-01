@@ -1,39 +1,43 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
-using System.Linq;
-using osu.Framework.Graphics;
-using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Handlers;
+using osu.Framework.Input.StateChanges.Events;
+using osu.Framework.Platform;
+using osuTK;
 
 namespace osu.Framework.Input
 {
-    public class UserInputManager : KeyBindingInputManager<FrameworkAction>
+    public class UserInputManager : PassThroughInputManager
     {
         protected override IEnumerable<InputHandler> InputHandlers => Host.AvailableInputHandlers;
 
-        public override IEnumerable<KeyBinding> DefaultKeyBindings => new[]
-        {
-            new KeyBinding(new[] { InputKey.Control, InputKey.F1 }, FrameworkAction.ToggleDrawVisualiser),
-            new KeyBinding(new[] { InputKey.Control, InputKey.F11 }, FrameworkAction.CycleFrameStatistics),
-            new KeyBinding(new[] { InputKey.Control, InputKey.F10 }, FrameworkAction.ToggleLogOverlay),
-            new KeyBinding(new[] { InputKey.Alt, InputKey.Enter }, FrameworkAction.ToggleFullscreen),
-        };
+        protected override bool HandleHoverEvents => Host.Window?.CursorInWindow ?? true;
 
         public UserInputManager()
         {
-            UseParentState = false;
+            UseParentInput = false;
         }
 
-        protected override IEnumerable<Drawable> KeyBindingInputQueue => new[] { Child }.Concat(base.KeyBindingInputQueue);
-    }
+        public override void HandleInputStateChange(InputStateChangeEvent inputStateChange)
+        {
+            switch (inputStateChange)
+            {
+                case MousePositionChangeEvent mousePositionChange:
+                    var mouse = mousePositionChange.State.Mouse;
+                    // confine cursor
+                    if (Host.Window != null && Host.Window.CursorState.HasFlag(CursorState.Confined))
+                        mouse.Position = Vector2.Clamp(mouse.Position, Vector2.Zero, new Vector2(Host.Window.Width, Host.Window.Height));
+                    break;
 
-    public enum FrameworkAction
-    {
-        CycleFrameStatistics,
-        ToggleDrawVisualiser,
-        ToggleLogOverlay,
-        ToggleFullscreen
+                case MouseScrollChangeEvent _:
+                    if (Host.Window != null && !Host.Window.CursorInWindow)
+                        return;
+                    break;
+            }
+
+            base.HandleInputStateChange(inputStateChange);
+        }
     }
 }

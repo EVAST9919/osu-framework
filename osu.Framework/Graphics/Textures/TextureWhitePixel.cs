@@ -1,10 +1,9 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics.OpenGL;
 using osu.Framework.Graphics.OpenGL.Textures;
 using osu.Framework.Graphics.Primitives;
-using System;
 
 namespace osu.Framework.Graphics.Textures
 {
@@ -13,13 +12,6 @@ namespace osu.Framework.Graphics.Textures
         public TextureWhitePixel(TextureGL textureGl)
             : base(textureGl)
         {
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                throw new InvalidOperationException($"May not dispose {nameof(TextureWhitePixel)} explicitly.");
-            base.Dispose(false);
         }
 
         protected override RectangleF TextureBounds(RectangleF? textureRect = null)

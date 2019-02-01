@@ -1,8 +1,7 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
-using OpenTK.Graphics;
 
 namespace osu.Framework.Testing.Drawables.Steps
 {
@@ -13,43 +12,45 @@ namespace osu.Framework.Testing.Drawables.Steps
 
         public override int RequiredRepetitions => count;
 
-        public new Action Action;
-
         private string text;
 
         public new string Text
         {
-            get { return text; }
-            set { base.Text = text = value; }
+            get => text;
+            set => base.Text = text = value;
         }
 
-        public RepeatStepButton(int count = 1)
+        public RepeatStepButton(Action action, int count = 1)
         {
             this.count = count;
+            Action = action;
 
             updateText();
-
-            BackgroundColour = Color4.Sienna;
-
-            base.Action = () =>
-            {
-                if (invocations == count) return;
-
-                invocations++;
-
-                if (invocations == count)
-                    Success();
-
-                updateText();
-
-                Action?.Invoke();
-            };
         }
 
-        private void updateText()
+        public override void PerformStep(bool userTriggered = false)
         {
-            base.Text = $@"{Text} {invocations}/{count}";
+            if (invocations == count && !userTriggered) throw new InvalidOperationException("Repeat step was invoked too many times");
+
+            invocations++;
+
+            base.PerformStep(userTriggered);
+
+            if (invocations >= count) // Allows for manual execution beyond the invocation limit.
+                Success();
+
+            updateText();
         }
+
+        public override void Reset()
+        {
+            base.Reset();
+
+            invocations = 0;
+            updateText();
+        }
+
+        private void updateText() => base.Text = $@"{Text} {invocations}/{count}";
 
         public override string ToString() => "Repeat: " + base.ToString();
     }

@@ -1,40 +1,25 @@
-// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Linq;
 using NUnit.Framework;
-using osu.Framework.Allocation;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
+    [System.ComponentModel.Description("ensure valid container state in various scenarios")]
     public class TestCaseContainerState : TestCase
     {
-        public override string Description => "Ensuring a container's state is consistent in various scenarios.";
-
-        private readonly Container container;
-
-        public TestCaseContainerState()
-        {
-            Add(container = new Container());
-        }
-
-        [BackgroundDependencyLoader]
-        private void load()
-        {
-            testLoadedMultipleAdds();
-        }
-
         /// <summary>
         /// Tests if a drawable can be added to a container, removed, and then re-added to the same container.
         /// </summary>
         [Test]
         public void TestPreLoadReAdding()
         {
+            var container = new Container();
             var sprite = new Sprite();
 
             // Add
@@ -60,26 +45,30 @@ namespace osu.Framework.Tests.Visual
             // Non-async
             Assert.Throws<InvalidOperationException>(() =>
             {
-                container.Add(new Container
+                var unused = new Container
                 {
                     // Container is an IReadOnlyList<T>, so Children can accept a Container.
                     // This further means that CompositeDrawable.AddInternal will try to add all of
                     // the children of the Container that was set to Children, which should throw an exception
                     Children = new Container { Child = new Container() }
-                });
+                };
             });
         }
 
         /// <summary>
         /// The same as <see cref="TestPreLoadMultipleAdds"/> however instead runs after the container is loaded.
         /// </summary>
-        private void testLoadedMultipleAdds()
+        [Test]
+        public void TestLoadedMultipleAdds()
         {
             AddAssert("Test loaded multiple adds", () =>
             {
+                var loadedContainer = new Container();
+                Add(loadedContainer);
+
                 try
                 {
-                    container.Add(new Container
+                    loadedContainer.Add(new Container
                     {
                         // Container is an IReadOnlyList<T>, so Children can accept a Container.
                         // This further means that CompositeDrawable.AddInternal will try to add all of

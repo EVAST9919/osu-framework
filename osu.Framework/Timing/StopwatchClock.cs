@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Extensions.TypeExtensions;
 using System;
@@ -27,7 +27,12 @@ namespace osu.Framework.Timing
                 Start();
         }
 
-        public double CurrentTime => (stopwatchMilliseconds - rateChangeUsed) * rate + rateChangeAccumulated + seekOffset;
+        public double CurrentTime => stopwatchCurrentTime + seekOffset;
+
+        /// <summary>
+        /// The current time, represented solely by the accumulated <see cref="Stopwatch"/> time.
+        /// </summary>
+        private double stopwatchCurrentTime => (stopwatchMilliseconds - rateChangeUsed) * rate + rateChangeAccumulated;
 
         private double stopwatchMilliseconds => (double)ElapsedTicks / Frequency * 1000;
 
@@ -35,8 +40,7 @@ namespace osu.Framework.Timing
 
         public double Rate
         {
-            get { return rate; }
-
+            get => rate;
             set
             {
                 if (rate == value) return;
@@ -52,8 +56,8 @@ namespace osu.Framework.Timing
 
         public bool Seek(double position)
         {
-            seekOffset = 0;
-            seekOffset = position - CurrentTime;
+            // Determine the offset that when added to stopwatchCurrentTime; results in the requested time value
+            seekOffset = position - stopwatchCurrentTime;
             return true;
         }
 

@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
@@ -7,7 +7,7 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using osu.Framework.Graphics.OpenGL;
-using OpenTK.Graphics.ES30;
+using osuTK.Graphics.ES30;
 
 namespace osu.Framework.Graphics.Shaders
 {
@@ -17,7 +17,7 @@ namespace osu.Framework.Graphics.Shaders
 
         internal StringBuilder Log = new StringBuilder();
 
-        internal List<AttributeInfo> Attributes = new List<AttributeInfo>();
+        internal List<ShaderInputInfo> ShaderInputs = new List<ShaderInputInfo>();
 
         internal string Name;
         internal bool HasCode;
@@ -27,12 +27,12 @@ namespace osu.Framework.Graphics.Shaders
 
         private int partID = -1;
 
-        private int lastAttributeIndex;
+        private int lastShaderInputIndex;
 
         private readonly List<string> shaderCodes = new List<string>();
 
         private readonly Regex includeRegex = new Regex("^\\s*#\\s*include\\s+[\"<](.*)[\">]");
-        private readonly Regex attributeRegex = new Regex("^\\s*attribute\\s+[^\\s]+\\s+([^;]+);");
+        private readonly Regex shaderInputRegex = new Regex("^\\s*(?>attribute|in)\\s+[^\\s]+\\s+([^;]+);");
 
         private readonly ShaderManager manager;
 
@@ -69,6 +69,12 @@ namespace osu.Framework.Graphics.Shaders
                     if (string.IsNullOrEmpty(line))
                         continue;
 
+                    if (line.StartsWith("#version")) // the version directive has to appear before anything else in the shader
+                    {
+                        shaderCodes.Add(line);
+                        continue;
+                    }
+
                     Match includeMatch = includeRegex.Match(line);
                     if (includeMatch.Success)
                     {
@@ -79,19 +85,22 @@ namespace osu.Framework.Graphics.Shaders
                         //                        if (File.Exists(includeName))
                         //                            rawData = File.ReadAllBytes(includeName);
                         //#endif
-                        shaderCodes.Add(loadFile(manager.LoadRaw(includeName)));
+                        code += loadFile(manager.LoadRaw(includeName)) + '\n';
                     }
                     else
-                        code += '\n' + line;
+                        code += line + '\n';
 
-                    Match attributeMatch = attributeRegex.Match(line);
-                    if (attributeMatch.Success)
+                    if (Type == ShaderType.VertexShader || Type == ShaderType.VertexShaderArb)
                     {
-                        Attributes.Add(new AttributeInfo
+                        Match inputMatch = shaderInputRegex.Match(line);
+                        if (inputMatch.Success)
                         {
-                            Location = lastAttributeIndex++,
-                            Name = attributeMatch.Groups[1].Value.Trim()
-                        });
+                            ShaderInputs.Add(new ShaderInputInfo
+                            {
+                                Location = lastShaderInputIndex++,
+                                Name = inputMatch.Groups[1].Value.Trim()
+                            });
+                        }
                     }
                 }
 
@@ -114,8 +123,7 @@ namespace osu.Framework.Graphics.Shaders
             GL.ShaderSource(this, shaderCodes.Count, shaderCodes.ToArray(), codeLengths);
             GL.CompileShader(this);
 
-            int compileResult;
-            GL.GetShader(this, ShaderParameter.CompileStatus, out compileResult);
+            GL.GetShader(this, ShaderParameter.CompileStatus, out int compileResult);
             Compiled = compileResult == 1;
 
 #if DEBUG

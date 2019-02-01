@@ -1,20 +1,17 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
-using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Testing;
-using OpenTK;
+using osuTK;
 
 namespace osu.Framework.Tests.Visual
 {
-    [TestFixture]
-    internal class TestCasePropertyBoundaries : TestCase
+    [System.ComponentModel.Description("ensure validity of drawables when receiving certain values")]
+    public class TestCasePropertyBoundaries : TestCase
     {
-        public override string Description => "Testing the validity of drawables after being passed certain values.";
-
         [BackgroundDependencyLoader]
         private void load()
         {

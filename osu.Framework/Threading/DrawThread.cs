@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2007-2017 ppy Pty Ltd <contact@ppy.sh>.
-// Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu-framework/master/LICENCE
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Statistics;
 using System;
@@ -9,7 +9,8 @@ namespace osu.Framework.Threading
 {
     public class DrawThread : GameThread
     {
-        public DrawThread(Action onNewFrame, string threadName) : base(onNewFrame, threadName)
+        public DrawThread(Action onNewFrame)
+            : base(onNewFrame, "Draw")
         {
         }
 
@@ -19,6 +20,7 @@ namespace osu.Framework.Threading
             StatisticsCounterType.VBufOverflow,
             StatisticsCounterType.TextureBinds,
             StatisticsCounterType.DrawCalls,
+            StatisticsCounterType.ShaderBinds,
             StatisticsCounterType.VerticesDraw,
             StatisticsCounterType.VerticesUpl,
             StatisticsCounterType.Pixels,
