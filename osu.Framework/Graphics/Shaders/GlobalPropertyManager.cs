@@ -31,6 +31,9 @@ namespace osu.Framework.Graphics.Shaders
             global_properties[(int)GlobalProperty.DiscardInner] = new UniformMapping<bool>("g_DiscardInner");
             global_properties[(int)GlobalProperty.InnerCornerRadius] = new UniformMapping<float>("g_InnerCornerRadius");
             global_properties[(int)GlobalProperty.GammaCorrection] = new UniformMapping<bool>("g_GammaCorrection");
+
+            // Backbuffer internals
+            global_properties[(int)GlobalProperty.BackbufferDraw] = new UniformMapping<bool>("g_BackbufferDraw");
         }
 
         /// <summary>
@@ -40,7 +43,10 @@ namespace osu.Framework.Graphics.Shaders
         /// <param name="property">The uniform.</param>
         /// <param name="value">The uniform value.</param>
         public static void Set<T>(GlobalProperty property, T value)
-            where T : struct => ((UniformMapping<T>)global_properties[(int)property]).UpdateValue(ref value);
+            where T : struct
+        {
+            ((UniformMapping<T>)global_properties[(int)property]).UpdateValue(ref value);
+        }
 
         public static void Register(Shader shader)
         {

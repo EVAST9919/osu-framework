@@ -14,11 +14,13 @@ using osuTK.Input;
 using System.ComponentModel;
 using System.Drawing;
 using JetBrains.Annotations;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 using Icon = osuTK.Icon;
 
 namespace osu.Framework.Platform
 {
-    public abstract class GameWindow : IGameWindow
+    public abstract class GameWindow : IWindow
     {
         /// <summary>
         /// The <see cref="IGraphicsContext"/> associated with this <see cref="GameWindow"/>.
@@ -44,8 +46,9 @@ namespace osu.Framework.Platform
         [CanBeNull]
         public event EventHandler<KeyboardKeyEventArgs> KeyDown;
 
-        internal Version GLVersion;
-        internal Version GLSLVersion;
+        internal readonly Version GLVersion;
+        internal readonly Version GLSLVersion;
+        internal readonly bool IsEmbedded;
 
         protected readonly IGameWindow Implementation;
 
@@ -58,6 +61,15 @@ namespace osu.Framework.Platform
         /// Available resolutions for full-screen display.
         /// </summary>
         public virtual IEnumerable<DisplayResolution> AvailableResolutions => Enumerable.Empty<DisplayResolution>();
+
+        public readonly Bindable<WindowMode> WindowMode = new Bindable<WindowMode>();
+
+        private readonly Bindable<bool> isActive = new Bindable<bool>();
+
+        /// <summary>
+        /// Whether this <see cref="GameWindow"/> is active (in the foreground).
+        /// </summary>
+        public IBindable<bool> IsActive => isActive;
 
         /// <summary>
         /// Creates a <see cref="GameWindow"/> with a given <see cref="IGameWindow"/> implementation.
@@ -73,12 +85,34 @@ namespace osu.Framework.Platform
             MouseEnter += (sender, args) => CursorInWindow = true;
             MouseLeave += (sender, args) => CursorInWindow = false;
 
+            FocusedChanged += (o, e) => isActive.Value = Focused;
+
+            supportedWindowModes.AddRange(DefaultSupportedWindowModes);
+
+            bool firstUpdate = true;
+            UpdateFrame += (o, e) =>
+            {
+                if (firstUpdate)
+                {
+                    isActive.Value = Focused;
+                    firstUpdate = false;
+                }
+            };
+
+            WindowStateChanged += (o, e) => isActive.Value = WindowState != WindowState.Minimized;
+
             MakeCurrent();
 
             string version = GL.GetString(StringName.Version);
             string versionNumberSubstring = getVersionNumberSubstring(version);
+
             GLVersion = new Version(versionNumberSubstring);
+
+            // As defined by https://www.khronos.org/registry/OpenGL-Refpages/es2.0/xhtml/glGetString.xml
+            IsEmbedded = version.Contains("OpenGL ES");
+
             version = GL.GetString(StringName.ShadingLanguageVersion);
+
             if (!string.IsNullOrEmpty(version))
             {
                 try
@@ -182,6 +216,7 @@ namespace osu.Framework.Platform
         {
             string result = version.Split(' ').FirstOrDefault(s => char.IsDigit(s, 0));
             if (result != null) return result;
+
             throw new ArgumentException(nameof(version));
         }
 
@@ -189,10 +224,46 @@ namespace osu.Framework.Platform
 
         protected virtual void OnKeyDown(object sender, KeyboardKeyEventArgs e) => KeyDown?.Invoke(sender, e);
 
+        /// <summary>
+        /// Provides a <see cref="BindableMarginPadding"/> that can be used to keep track of the "safe area" insets on mobile
+        /// devices.  This usually corresponds to areas of the screen hidden under notches and rounded corners.
+        /// The safe area insets are provided by the operating system and dynamically change as the user rotates the device.
+        /// </summary>
+        public virtual IBindable<MarginPadding> SafeAreaPadding { get; } = new BindableMarginPadding();
+
+        private readonly BindableList<WindowMode> supportedWindowModes = new BindableList<WindowMode>();
+
+        public IBindableList<WindowMode> SupportedWindowModes => supportedWindowModes;
+
+        public virtual WindowMode DefaultWindowMode => SupportedWindowModes.First();
+
+        protected abstract IEnumerable<WindowMode> DefaultSupportedWindowModes { get; }
+
         public virtual VSyncMode VSync { get; set; }
 
         public virtual void CycleMode()
         {
+            var currentValue = WindowMode.Value;
+
+            do
+            {
+                switch (currentValue)
+                {
+                    case Configuration.WindowMode.Windowed:
+                        currentValue = Configuration.WindowMode.Borderless;
+                        break;
+
+                    case Configuration.WindowMode.Borderless:
+                        currentValue = Configuration.WindowMode.Fullscreen;
+                        break;
+
+                    case Configuration.WindowMode.Fullscreen:
+                        currentValue = Configuration.WindowMode.Windowed;
+                        break;
+                }
+            } while (!SupportedWindowModes.Contains(currentValue) && currentValue != WindowMode.Value);
+
+            WindowMode.Value = currentValue;
         }
 
         #region Autogenerated IGameWindow implementation
@@ -202,23 +273,94 @@ namespace osu.Framework.Platform
         public void MakeCurrent() => Implementation.MakeCurrent();
         public void SwapBuffers() => Implementation.SwapBuffers();
 
-        Icon INativeWindow.Icon { get => Implementation.Icon; set => Implementation.Icon = value; }
-        public string Title { get => Implementation.Title; set => Implementation.Title = value; }
+        Icon INativeWindow.Icon
+        {
+            get => Implementation.Icon;
+            set => Implementation.Icon = value;
+        }
+
+        public string Title
+        {
+            get => Implementation.Title;
+            set => Implementation.Title = value;
+        }
+
         public virtual bool Focused => Implementation.Focused;
-        public bool Visible { get => Implementation.Visible; set => Implementation.Visible = value; }
+
+        public bool Visible
+        {
+            get => Implementation.Visible;
+            set => Implementation.Visible = value;
+        }
+
         public bool Exists => Implementation.Exists;
         public IWindowInfo WindowInfo => Implementation.WindowInfo;
-        public virtual WindowState WindowState { get => Implementation.WindowState; set => Implementation.WindowState = value; }
-        public WindowBorder WindowBorder { get => Implementation.WindowBorder; set => Implementation.WindowBorder = value; }
-        public Rectangle Bounds { get => Implementation.Bounds; set => Implementation.Bounds = value; }
-        public Point Location { get => Implementation.Location; set => Implementation.Location = value; }
-        public Size Size { get => Implementation.Size; set => Implementation.Size = value; }
-        public int X { get => Implementation.X; set => Implementation.X = value; }
-        public int Y { get => Implementation.Y; set => Implementation.Y = value; }
-        public int Width { get => Implementation.Width; set => Implementation.Width = value; }
-        public int Height { get => Implementation.Height; set => Implementation.Height = value; }
-        public Rectangle ClientRectangle { get => Implementation.ClientRectangle; set => Implementation.ClientRectangle = value; }
-        public Size ClientSize { get => Implementation.ClientSize; set => Implementation.ClientSize = value; }
+
+        public virtual WindowState WindowState
+        {
+            get => Implementation.WindowState;
+            set => Implementation.WindowState = value;
+        }
+
+        public WindowBorder WindowBorder
+        {
+            get => Implementation.WindowBorder;
+            set => Implementation.WindowBorder = value;
+        }
+
+        public Rectangle Bounds
+        {
+            get => Implementation.Bounds;
+            set => Implementation.Bounds = value;
+        }
+
+        public Point Location
+        {
+            get => Implementation.Location;
+            set => Implementation.Location = value;
+        }
+
+        public Size Size
+        {
+            get => Implementation.Size;
+            set => Implementation.Size = value;
+        }
+
+        public int X
+        {
+            get => Implementation.X;
+            set => Implementation.X = value;
+        }
+
+        public int Y
+        {
+            get => Implementation.Y;
+            set => Implementation.Y = value;
+        }
+
+        public int Width
+        {
+            get => Implementation.Width;
+            set => Implementation.Width = value;
+        }
+
+        public int Height
+        {
+            get => Implementation.Height;
+            set => Implementation.Height = value;
+        }
+
+        public Rectangle ClientRectangle
+        {
+            get => Implementation.ClientRectangle;
+            set => Implementation.ClientRectangle = value;
+        }
+
+        public Size ClientSize
+        {
+            get => Implementation.ClientSize;
+            set => Implementation.ClientSize = value;
+        }
 
         public void Close() => Implementation.Close();
         public void ProcessEvents() => Implementation.ProcessEvents();
@@ -226,30 +368,149 @@ namespace osu.Framework.Platform
         public Point PointToScreen(Point point) => Implementation.PointToScreen(point);
         public void Dispose() => Implementation.Dispose();
 
-        public event EventHandler<EventArgs> Load { add => Implementation.Load += value; remove => Implementation.Load -= value; }
-        public event EventHandler<EventArgs> Unload { add => Implementation.Unload += value; remove => Implementation.Unload -= value; }
-        public event EventHandler<FrameEventArgs> UpdateFrame { add => Implementation.UpdateFrame += value; remove => Implementation.UpdateFrame -= value; }
-        public event EventHandler<FrameEventArgs> RenderFrame { add => Implementation.RenderFrame += value; remove => Implementation.RenderFrame -= value; }
-        public event EventHandler<EventArgs> Move { add => Implementation.Move += value; remove => Implementation.Move -= value; }
-        public event EventHandler<EventArgs> Resize { add => Implementation.Resize += value; remove => Implementation.Resize -= value; }
-        public event EventHandler<CancelEventArgs> Closing { add => Implementation.Closing += value; remove => Implementation.Closing -= value; }
-        public event EventHandler<EventArgs> Closed { add => Implementation.Closed += value; remove => Implementation.Closed -= value; }
-        public event EventHandler<EventArgs> Disposed { add => Implementation.Disposed += value; remove => Implementation.Disposed -= value; }
-        public event EventHandler<EventArgs> IconChanged { add => Implementation.IconChanged += value; remove => Implementation.IconChanged -= value; }
-        public event EventHandler<EventArgs> TitleChanged { add => Implementation.TitleChanged += value; remove => Implementation.TitleChanged -= value; }
-        public event EventHandler<EventArgs> VisibleChanged { add => Implementation.VisibleChanged += value; remove => Implementation.VisibleChanged -= value; }
-        public event EventHandler<EventArgs> FocusedChanged { add => Implementation.FocusedChanged += value; remove => Implementation.FocusedChanged -= value; }
-        public event EventHandler<EventArgs> WindowBorderChanged { add => Implementation.WindowBorderChanged += value; remove => Implementation.WindowBorderChanged -= value; }
-        public event EventHandler<EventArgs> WindowStateChanged { add => Implementation.WindowStateChanged += value; remove => Implementation.WindowStateChanged -= value; }
-        public event EventHandler<KeyPressEventArgs> KeyPress { add => Implementation.KeyPress += value; remove => Implementation.KeyPress -= value; }
-        public event EventHandler<KeyboardKeyEventArgs> KeyUp { add => Implementation.KeyUp += value; remove => Implementation.KeyUp -= value; }
-        public event EventHandler<EventArgs> MouseLeave { add => Implementation.MouseLeave += value; remove => Implementation.MouseLeave -= value; }
-        public event EventHandler<EventArgs> MouseEnter { add => Implementation.MouseEnter += value; remove => Implementation.MouseEnter -= value; }
-        public event EventHandler<MouseButtonEventArgs> MouseDown { add => Implementation.MouseDown += value; remove => Implementation.MouseDown -= value; }
-        public event EventHandler<MouseButtonEventArgs> MouseUp { add => Implementation.MouseUp += value; remove => Implementation.MouseUp -= value; }
-        public event EventHandler<MouseMoveEventArgs> MouseMove { add => Implementation.MouseMove += value; remove => Implementation.MouseMove -= value; }
-        public event EventHandler<MouseWheelEventArgs> MouseWheel { add => Implementation.MouseWheel += value; remove => Implementation.MouseWheel -= value; }
-        public event EventHandler<FileDropEventArgs> FileDrop { add => Implementation.FileDrop += value; remove => Implementation.FileDrop -= value; }
+        public event EventHandler<EventArgs> Load
+        {
+            add => Implementation.Load += value;
+            remove => Implementation.Load -= value;
+        }
+
+        public event EventHandler<EventArgs> Unload
+        {
+            add => Implementation.Unload += value;
+            remove => Implementation.Unload -= value;
+        }
+
+        public event EventHandler<FrameEventArgs> UpdateFrame
+        {
+            add => Implementation.UpdateFrame += value;
+            remove => Implementation.UpdateFrame -= value;
+        }
+
+        public event EventHandler<FrameEventArgs> RenderFrame
+        {
+            add => Implementation.RenderFrame += value;
+            remove => Implementation.RenderFrame -= value;
+        }
+
+        public event EventHandler<EventArgs> Move
+        {
+            add => Implementation.Move += value;
+            remove => Implementation.Move -= value;
+        }
+
+        public event EventHandler<EventArgs> Resize
+        {
+            add => Implementation.Resize += value;
+            remove => Implementation.Resize -= value;
+        }
+
+        public event EventHandler<CancelEventArgs> Closing
+        {
+            add => Implementation.Closing += value;
+            remove => Implementation.Closing -= value;
+        }
+
+        public event EventHandler<EventArgs> Closed
+        {
+            add => Implementation.Closed += value;
+            remove => Implementation.Closed -= value;
+        }
+
+        public event EventHandler<EventArgs> Disposed
+        {
+            add => Implementation.Disposed += value;
+            remove => Implementation.Disposed -= value;
+        }
+
+        public event EventHandler<EventArgs> IconChanged
+        {
+            add => Implementation.IconChanged += value;
+            remove => Implementation.IconChanged -= value;
+        }
+
+        public event EventHandler<EventArgs> TitleChanged
+        {
+            add => Implementation.TitleChanged += value;
+            remove => Implementation.TitleChanged -= value;
+        }
+
+        public event EventHandler<EventArgs> VisibleChanged
+        {
+            add => Implementation.VisibleChanged += value;
+            remove => Implementation.VisibleChanged -= value;
+        }
+
+        public event EventHandler<EventArgs> FocusedChanged
+        {
+            add => Implementation.FocusedChanged += value;
+            remove => Implementation.FocusedChanged -= value;
+        }
+
+        public event EventHandler<EventArgs> WindowBorderChanged
+        {
+            add => Implementation.WindowBorderChanged += value;
+            remove => Implementation.WindowBorderChanged -= value;
+        }
+
+        public event EventHandler<EventArgs> WindowStateChanged
+        {
+            add => Implementation.WindowStateChanged += value;
+            remove => Implementation.WindowStateChanged -= value;
+        }
+
+        public event EventHandler<KeyPressEventArgs> KeyPress
+        {
+            add => Implementation.KeyPress += value;
+            remove => Implementation.KeyPress -= value;
+        }
+
+        public event EventHandler<KeyboardKeyEventArgs> KeyUp
+        {
+            add => Implementation.KeyUp += value;
+            remove => Implementation.KeyUp -= value;
+        }
+
+        public event EventHandler<EventArgs> MouseLeave
+        {
+            add => Implementation.MouseLeave += value;
+            remove => Implementation.MouseLeave -= value;
+        }
+
+        public event EventHandler<EventArgs> MouseEnter
+        {
+            add => Implementation.MouseEnter += value;
+            remove => Implementation.MouseEnter -= value;
+        }
+
+        public event EventHandler<MouseButtonEventArgs> MouseDown
+        {
+            add => Implementation.MouseDown += value;
+            remove => Implementation.MouseDown -= value;
+        }
+
+        public event EventHandler<MouseButtonEventArgs> MouseUp
+        {
+            add => Implementation.MouseUp += value;
+            remove => Implementation.MouseUp -= value;
+        }
+
+        public event EventHandler<MouseMoveEventArgs> MouseMove
+        {
+            add => Implementation.MouseMove += value;
+            remove => Implementation.MouseMove -= value;
+        }
+
+        public event EventHandler<MouseWheelEventArgs> MouseWheel
+        {
+            add => Implementation.MouseWheel += value;
+            remove => Implementation.MouseWheel -= value;
+        }
+
+        public event EventHandler<FileDropEventArgs> FileDrop
+        {
+            add => Implementation.FileDrop += value;
+            remove => Implementation.FileDrop -= value;
+        }
 
         #endregion
     }

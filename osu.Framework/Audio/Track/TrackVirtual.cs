@@ -6,15 +6,15 @@ using osuTK;
 
 namespace osu.Framework.Audio.Track
 {
-    public class TrackVirtual : Track
+    public sealed class TrackVirtual : Track
     {
         private readonly StopwatchClock clock = new StopwatchClock();
 
         private double seekOffset;
 
-        public TrackVirtual()
+        public TrackVirtual(double length)
         {
-            Length = double.PositiveInfinity;
+            Length = length;
         }
 
         public override bool Seek(double seek)
@@ -76,8 +76,11 @@ namespace osu.Framework.Audio.Track
 
             lock (clock)
             {
-                if (CurrentTime >= Length)
+                if (clock.IsRunning && CurrentTime >= Length)
+                {
                     Stop();
+                    RaiseCompleted();
+                }
             }
         }
 
@@ -86,7 +89,7 @@ namespace osu.Framework.Audio.Track
             base.OnStateChanged();
 
             lock (clock)
-                clock.Rate = Tempo;
+                clock.Rate = Tempo.Value * AggregateFrequency.Value;
         }
     }
 }

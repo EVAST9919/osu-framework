@@ -1,15 +1,21 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Configuration;
 using osu.Framework.Statistics;
 using osu.Framework.Timing;
 using System;
+using osu.Framework.Bindables;
 
 namespace osu.Framework.Audio.Track
 {
-    public abstract class Track : AdjustableAudioComponent, IAdjustableClock
+    public abstract class Track : AdjustableAudioComponent, IAdjustableClock, IHasTempoAdjust, ITrack
     {
+        public event Action Completed;
+        public event Action Failed;
+
+        protected virtual void RaiseCompleted() => Completed?.Invoke();
+        protected virtual void RaiseFailed() => Failed?.Invoke();
+
         /// <summary>
         /// Is this track capable of producing audio?
         /// </summary>
@@ -81,6 +87,7 @@ namespace osu.Framework.Audio.Track
             {
                 if (value < 0)
                     throw new ArgumentException("Track length must be >= 0.", nameof(value));
+
                 length = value;
             }
         }
@@ -111,8 +118,8 @@ namespace osu.Framework.Audio.Track
         /// </summary>
         public virtual double Rate
         {
-            get => Frequency * Tempo;
-            set => Tempo.Value = value;
+            get => Frequency.Value * Tempo.Value;
+            set => throw new InvalidOperationException($"Setting {nameof(Rate)} directly on a {nameof(Track)} is not supported. Set {nameof(IHasPitchAdjust.PitchAdjust)} or {nameof(IHasTempoAdjust.TempoAdjust)} instead.");
         }
 
         public bool IsReversed => Rate < 0;
@@ -125,6 +132,15 @@ namespace osu.Framework.Audio.Track
         /// The most recent values are returned. Synchronisation between channels should not be expected.
         /// </summary>
         public virtual TrackAmplitudes CurrentAmplitudes => new TrackAmplitudes();
+
+        /// <summary>
+        /// The playback tempo multiplier for this track, where 1 is the original speed.
+        /// </summary>
+        public double TempoAdjust
+        {
+            get => Tempo.Value;
+            set => Tempo.Value = value;
+        }
 
         protected override void UpdateState()
         {

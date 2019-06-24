@@ -10,14 +10,11 @@ using osuTK.Graphics.ES30;
 
 namespace osu.Framework.Graphics.Shaders
 {
-    public class Shader : IDisposable
+    public class Shader : IDisposable, IShader
     {
         internal StringBuilder Log = new StringBuilder();
 
-        /// <summary>
-        /// Whether this shader has been loaded and compiled.
-        /// </summary>
-        public bool Loaded { get; private set; }
+        public bool IsLoaded { get; private set; }
 
         internal bool IsBound;
 
@@ -36,34 +33,6 @@ namespace osu.Framework.Graphics.Shaders
             GLWrapper.EnqueueShaderCompile(this);
         }
 
-        #region Disposal
-
-        ~Shader()
-        {
-            Dispose(false);
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (Loaded)
-            {
-                Unbind();
-
-                GLWrapper.DeleteProgram(this);
-                Loaded = false;
-                programID = -1;
-                GlobalPropertyManager.Unregister(this);
-            }
-        }
-
-        #endregion
-
         internal void Compile()
         {
             parts.RemoveAll(p => p == null);
@@ -78,6 +47,7 @@ namespace osu.Framework.Graphics.Shaders
                 return;
 
             programID = GL.CreateProgram();
+
             foreach (ShaderPart p in parts)
             {
                 if (!p.Compiled) p.Compile();
@@ -94,6 +64,7 @@ namespace osu.Framework.Graphics.Shaders
 
             Log.AppendLine(string.Format(ShaderPart.BOUNDARY, name));
             Log.AppendLine($"Linked: {linkResult == 1}");
+
             if (linkResult == 0)
             {
                 Log.AppendLine("Log:");
@@ -103,9 +74,9 @@ namespace osu.Framework.Graphics.Shaders
             foreach (var part in parts)
                 GL.DetachShader(this, part);
 
-            Loaded = linkResult == 1;
+            IsLoaded = linkResult == 1;
 
-            if (Loaded)
+            if (IsLoaded)
             {
                 // Obtain all the shader uniforms
                 GL.GetProgram(this, GetProgramParameterName.ActiveUniforms, out int uniformCount);
@@ -121,36 +92,46 @@ namespace osu.Framework.Graphics.Shaders
                         int location = GL.GetUniformLocation(this, name);
 
                         if (GlobalPropertyManager.CheckGlobalExists(name)) return new GlobalUniform<T>(this, name, location);
+
                         return new Uniform<T>(this, name, location);
                     }
 
                     IUniform uniform;
+
                     switch (type)
                     {
                         case ActiveUniformType.Bool:
                             uniform = createUniform<bool>(uniformName);
                             break;
+
                         case ActiveUniformType.Float:
                             uniform = createUniform<float>(uniformName);
                             break;
+
                         case ActiveUniformType.Int:
                             uniform = createUniform<int>(uniformName);
                             break;
+
                         case ActiveUniformType.FloatMat3:
                             uniform = createUniform<Matrix3>(uniformName);
                             break;
+
                         case ActiveUniformType.FloatMat4:
                             uniform = createUniform<Matrix4>(uniformName);
                             break;
+
                         case ActiveUniformType.FloatVec2:
                             uniform = createUniform<Vector2>(uniformName);
                             break;
+
                         case ActiveUniformType.FloatVec3:
                             uniform = createUniform<Vector3>(uniformName);
                             break;
+
                         case ActiveUniformType.FloatVec4:
                             uniform = createUniform<Vector4>(uniformName);
                             break;
+
                         default:
                             continue;
                     }
@@ -165,7 +146,7 @@ namespace osu.Framework.Graphics.Shaders
 
         internal void EnsureLoaded()
         {
-            if (!Loaded)
+            if (!IsLoaded)
                 Compile();
         }
 
@@ -209,9 +190,36 @@ namespace osu.Framework.Graphics.Shaders
             return (Uniform<T>)Uniforms[name];
         }
 
-        public static implicit operator int(Shader shader)
+        public static implicit operator int(Shader shader) => shader.programID;
+
+        #region Disposal
+
+        ~Shader()
         {
-            return shader.programID;
+            Dispose(false);
         }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing) => GLWrapper.ScheduleDisposal(() =>
+        {
+            if (IsLoaded)
+            {
+                IsLoaded = false;
+
+                Unbind();
+                GL.DeleteProgram(this);
+
+                GlobalPropertyManager.Unregister(this);
+
+                programID = -1;
+            }
+        });
+
+        #endregion
     }
 }

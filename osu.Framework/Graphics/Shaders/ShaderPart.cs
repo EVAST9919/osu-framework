@@ -25,6 +25,8 @@ namespace osu.Framework.Graphics.Shaders
 
         internal ShaderType Type;
 
+        private bool isVertexShader => Type == ShaderType.VertexShader || Type == ShaderType.VertexShaderArb;
+
         private int partID = -1;
 
         private int lastShaderInputIndex;
@@ -43,7 +45,7 @@ namespace osu.Framework.Graphics.Shaders
 
             this.manager = manager;
 
-            shaderCodes.Add(loadFile(data));
+            shaderCodes.Add(loadFile(data, true));
             shaderCodes.RemoveAll(string.IsNullOrEmpty);
 
             if (shaderCodes.Count == 0)
@@ -52,7 +54,7 @@ namespace osu.Framework.Graphics.Shaders
             HasCode = true;
         }
 
-        private string loadFile(byte[] bytes)
+        private string loadFile(byte[] bytes, bool mainFile)
         {
             if (bytes == null)
                 return null;
@@ -76,6 +78,7 @@ namespace osu.Framework.Graphics.Shaders
                     }
 
                     Match includeMatch = includeRegex.Match(line);
+
                     if (includeMatch.Success)
                     {
                         string includeName = includeMatch.Groups[1].Value.Trim();
@@ -85,7 +88,7 @@ namespace osu.Framework.Graphics.Shaders
                         //                        if (File.Exists(includeName))
                         //                            rawData = File.ReadAllBytes(includeName);
                         //#endif
-                        code += loadFile(manager.LoadRaw(includeName)) + '\n';
+                        code += loadFile(manager.LoadRaw(includeName), false) + '\n';
                     }
                     else
                         code += line + '\n';
@@ -93,6 +96,7 @@ namespace osu.Framework.Graphics.Shaders
                     if (Type == ShaderType.VertexShader || Type == ShaderType.VertexShaderArb)
                     {
                         Match inputMatch = shaderInputRegex.Match(line);
+
                         if (inputMatch.Success)
                         {
                             ShaderInputs.Add(new ShaderInputInfo
@@ -102,6 +106,16 @@ namespace osu.Framework.Graphics.Shaders
                             });
                         }
                     }
+                }
+
+                if (mainFile && isVertexShader)
+                {
+                    string realMainName = "real_main_" + Guid.NewGuid().ToString("N");
+
+                    string backbufferCode = loadFile(manager.LoadRaw("sh_Backbuffer_Internal.h"), false);
+
+                    backbufferCode = backbufferCode.Replace("{{ real_main }}", realMainName);
+                    code = Regex.Replace(code, @"void main\((.*)\)", $"void {realMainName}()") + backbufferCode + '\n';
                 }
 
                 return code;
@@ -130,6 +144,7 @@ namespace osu.Framework.Graphics.Shaders
             string compileLog = GL.GetShaderInfoLog(this);
             Log.AppendLine(string.Format('\t' + BOUNDARY, Name));
             Log.AppendLine($"\tCompiled: {Compiled}");
+
             if (!Compiled)
             {
                 Log.AppendLine("\tLog:");
@@ -138,14 +153,27 @@ namespace osu.Framework.Graphics.Shaders
 #endif
 
             if (!Compiled)
-                Dispose(true);
+                delete();
 
             return Compiled;
         }
 
-        public static implicit operator int(ShaderPart program)
+        public static implicit operator int(ShaderPart program) => program.partID;
+
+        private void delete()
         {
-            return program.partID;
+            if (partID == -1) return;
+
+            GL.DeleteShader(this);
+            Compiled = false;
+            partID = -1;
+        }
+
+        #region Disposal
+
+        ~ShaderPart()
+        {
+            Dispose(false);
         }
 
         public void Dispose()
@@ -154,13 +182,8 @@ namespace osu.Framework.Graphics.Shaders
             GC.SuppressFinalize(this);
         }
 
-        protected void Dispose(bool disposing)
-        {
-            if (!disposing || partID == -1) return;
+        protected void Dispose(bool disposing) => GLWrapper.ScheduleDisposal(delete);
 
-            GLWrapper.DeleteShader(this);
-            Compiled = false;
-            partID = -1;
-        }
+        #endregion
     }
 }

@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Colour;
 using osuTK;
 using System.Collections;
 using System.Diagnostics;
+using osu.Framework.Graphics.Effects;
 
 namespace osu.Framework.Graphics.Containers
 {
@@ -34,7 +35,7 @@ namespace osu.Framework.Graphics.Containers
         where T : Drawable
     {
         /// <summary>
-        /// Contructs a <see cref="Container"/> that stores children.
+        /// Constructs a <see cref="Container"/> that stores children.
         /// </summary>
         public Container()
         {
@@ -50,7 +51,7 @@ namespace osu.Framework.Graphics.Containers
         /// forwarded to the content. By default a container's content is itself, in which case
         /// <see cref="Children"/> refers to <see cref="CompositeDrawable.InternalChildren"/>.
         /// This property is useful for containers that require internal children that should
-        /// not be exposed to the outside world, e.g. <see cref="ScrollContainer"/>.
+        /// not be exposed to the outside world, e.g. <see cref="ScrollContainer{T}"/>.
         /// </summary>
         protected virtual Container<T> Content => this;
 
@@ -353,6 +354,15 @@ namespace osu.Framework.Graphics.Containers
         {
             get => base.Padding;
             set => base.Padding = value;
+        }
+
+        /// <summary>
+        /// Whether to use a local vertex batch for rendering. If false, a parenting vertex batch will be used.
+        /// </summary>
+        public new bool ForceLocalVertexBatch
+        {
+            get => base.ForceLocalVertexBatch;
+            set => base.ForceLocalVertexBatch = value;
         }
 
         /// <summary>

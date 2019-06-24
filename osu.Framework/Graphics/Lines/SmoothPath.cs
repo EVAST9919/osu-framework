@@ -19,14 +19,15 @@ namespace osu.Framework.Graphics.Lines
             validateTexture();
         }
 
-        public override float PathWidth
+        public override float PathRadius
         {
-            get => base.PathWidth;
+            get => base.PathRadius;
             set
             {
-                if (base.PathWidth == value)
+                if (base.PathRadius == value)
                     return;
-                base.PathWidth = value;
+
+                base.PathRadius = value;
 
                 InvalidateTexture();
             }
@@ -45,7 +46,7 @@ namespace osu.Framework.Graphics.Lines
             if (textureCache.IsValid)
                 return;
 
-            int textureWidth = (int)PathWidth * 2;
+            int textureWidth = (int)PathRadius * 2;
 
             var texture = new Texture(textureWidth, 1);
 
@@ -68,18 +69,17 @@ namespace osu.Framework.Graphics.Lines
             textureCache.Validate();
         }
 
+        internal override DrawNode GenerateDrawNodeSubtree(ulong frame, int treeIndex, bool forceNewDrawNode)
+        {
+            validateTexture();
+            return base.GenerateDrawNodeSubtree(frame, treeIndex, forceNewDrawNode);
+        }
+
         /// <summary>
         /// Retrieves the colour from a position in the texture of the <see cref="Path"/>.
         /// </summary>
         /// <param name="position">The position within the texture. 0 indicates the outermost-point of the path, 1 indicates the centre of the path.</param>
         /// <returns></returns>
         protected virtual Color4 ColourAt(float position) => Color4.White;
-
-        protected override void ApplyDrawNode(DrawNode node)
-        {
-            validateTexture();
-
-            base.ApplyDrawNode(node);
-        }
     }
 }

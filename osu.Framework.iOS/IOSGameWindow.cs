@@ -4,6 +4,10 @@
 using osuTK.Graphics;
 using osu.Framework.Configuration;
 using osu.Framework.Platform;
+using osu.Framework.Graphics;
+using System;
+using System.Collections.Generic;
+using osu.Framework.Bindables;
 
 namespace osu.Framework.iOS
 {
@@ -11,14 +15,18 @@ namespace osu.Framework.iOS
     {
         internal static IOSGameView GameView;
 
-        public IOSGameWindow() : base(GameView)
+        private readonly BindableMarginPadding safeAreaPadding = new BindableMarginPadding();
+
+        public override IBindable<MarginPadding> SafeAreaPadding => safeAreaPadding;
+
+        public IOSGameWindow()
+            : base(GameView)
         {
         }
 
         public override void SetupWindow(FrameworkConfigManager config)
         {
-            // TODO
-
+            Resize += onResize;
             // for now, let's just say the cursor is always in the window.
             CursorInWindow = true;
         }
@@ -27,7 +35,16 @@ namespace osu.Framework.iOS
 
         public override bool Focused => true;
 
-        public override osuTK.WindowState WindowState { get => osuTK.WindowState.Normal; set { } }
+        public override osuTK.WindowState WindowState
+        {
+            get => osuTK.WindowState.Normal;
+            set { }
+        }
+
+        protected override IEnumerable<WindowMode> DefaultSupportedWindowModes => new[]
+        {
+            Configuration.WindowMode.Fullscreen,
+        };
 
         public override void Run()
         {
@@ -37,6 +54,17 @@ namespace osu.Framework.iOS
         public override void Run(double updateRate)
         {
             // do nothing for iOS
+        }
+
+        private void onResize(object sender, EventArgs e)
+        {
+            safeAreaPadding.Value = new MarginPadding
+            {
+                Top = (float)GameView.SafeArea.Top * GameView.Scale,
+                Left = (float)GameView.SafeArea.Left * GameView.Scale,
+                Bottom = (float)GameView.SafeArea.Bottom * GameView.Scale,
+                Right = (float)GameView.SafeArea.Right * GameView.Scale
+            };
         }
     }
 }

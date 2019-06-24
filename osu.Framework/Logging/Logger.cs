@@ -129,9 +129,10 @@ namespace osu.Framework.Logging
         /// <param name="message">The message to log. Can include newline (\n) characters to split into multiple lines.</param>
         /// <param name="target">The logging target (file).</param>
         /// <param name="level">The verbosity level.</param>
-        public static void Log(string message, LoggingTarget target = LoggingTarget.Runtime, LogLevel level = LogLevel.Verbose)
+        /// <param name="outputToListeners">Whether the message should be sent to listeners of <see cref="Debug"/> and <see cref="Console"/>. True by default.</param>
+        public static void Log(string message, LoggingTarget target = LoggingTarget.Runtime, LogLevel level = LogLevel.Verbose, bool outputToListeners = true)
         {
-            log(message, target, null, level);
+            log(message, target, null, level, outputToListeners: outputToListeners);
         }
 
         /// <summary>
@@ -140,19 +141,20 @@ namespace osu.Framework.Logging
         /// <param name="message">The message to log. Can include newline (\n) characters to split into multiple lines.</param>
         /// <param name="name">The logger name (file).</param>
         /// <param name="level">The verbosity level.</param>
-        public static void Log(string message, string name, LogLevel level = LogLevel.Verbose)
+        /// <param name="outputToListeners">Whether the message should be sent to listeners of <see cref="Debug"/> and <see cref="Console"/>. True by default.</param>
+        public static void Log(string message, string name, LogLevel level = LogLevel.Verbose, bool outputToListeners = true)
         {
-            log(message, null, name, level);
+            log(message, null, name, level, outputToListeners: outputToListeners);
         }
 
-        private static void log(string message, LoggingTarget? target, string loggerName, LogLevel level, Exception exception = null)
+        private static void log(string message, LoggingTarget? target, string loggerName, LogLevel level, Exception exception = null, bool outputToListeners = true)
         {
             try
             {
                 if (target.HasValue)
-                    GetLogger(target.Value).Add(message, level, exception);
+                    GetLogger(target.Value).Add(message, level, exception, outputToListeners);
                 else
-                    GetLogger(loggerName).Add(message, level, exception);
+                    GetLogger(loggerName).Add(message, level, exception, outputToListeners);
             }
             catch
             {
@@ -192,12 +194,7 @@ namespace osu.Framework.Logging
         /// </summary>
         /// <param name="target">The logging target.</param>
         /// <returns>The logger responsible for the given logging target.</returns>
-        public static Logger GetLogger(LoggingTarget target = LoggingTarget.Runtime)
-        {
-            // there can be no name conflicts between LoggingTarget-based Loggers and named loggers because
-            // every name that would coincide with a LoggingTarget-value is reserved and cannot be used (see ctor).
-            return GetLogger(target.ToString());
-        }
+        public static Logger GetLogger(LoggingTarget target = LoggingTarget.Runtime) => GetLogger(target.ToString());
 
         /// <summary>
         /// For classes that regularly log to the same target, this method may be preferred over the static Log method.
@@ -209,6 +206,7 @@ namespace osu.Framework.Logging
             lock (static_sync_lock)
             {
                 var nameLower = name.ToLower();
+
                 if (!static_loggers.TryGetValue(nameLower, out Logger l))
                 {
                     static_loggers[nameLower] = l = Enum.TryParse(name, true, out LoggingTarget target) ? new Logger(target) : new Logger(name);
@@ -268,8 +266,9 @@ namespace osu.Framework.Logging
         /// <param name="message">The message to log. Can include newline (\n) characters to split into multiple lines.</param>
         /// <param name="level">The verbosity level.</param>
         /// <param name="exception">An optional related exception.</param>
-        public void Add(string message = @"", LogLevel level = LogLevel.Verbose, Exception exception = null) =>
-            add(message, level, exception, OutputToListeners);
+        /// <param name="outputToListeners">Whether the message should be sent to listeners of <see cref="Debug"/> and <see cref="Console"/>. True by default.</param>
+        public void Add(string message = @"", LogLevel level = LogLevel.Verbose, Exception exception = null, bool outputToListeners = true) =>
+            add(message, level, exception, outputToListeners && OutputToListeners);
 
         private readonly RollingTime debugOutputRollingTime = new RollingTime(50, 10000);
 
@@ -291,7 +290,7 @@ namespace osu.Framework.Logging
             IEnumerable<string> lines = logOutput
                                         .Replace(@"\r\n", @"\n")
                                         .Split('\n')
-                                        .Select(s => $@"{DateTime.UtcNow.ToString(NumberFormatInfo.InvariantInfo)}: {s.Trim()}");
+                                        .Select(s => $@"{DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss", CultureInfo.InvariantCulture)}: {s.Trim()}");
 
             if (outputToListeners)
             {
@@ -387,6 +386,7 @@ namespace osu.Framework.Logging
         private void ensureHeader()
         {
             if (headerAdded) return;
+
             headerAdded = true;
 
             add("----------------------------------------------------------", outputToListeners: false);
@@ -403,10 +403,10 @@ namespace osu.Framework.Logging
 
         private static readonly ManualResetEvent writer_idle = new ManualResetEvent(true);
 
-        private static readonly Timer timer;
-
         static Logger()
         {
+            Timer timer = null;
+
             // timer has a very low overhead.
             timer = new Timer(_ =>
             {
@@ -414,7 +414,8 @@ namespace osu.Framework.Logging
                     writer_idle.Set();
 
                 // reschedule every 50ms. avoids overlapping callbacks.
-                timer.Change(50, Timeout.Infinite);
+                // ReSharper disable once AccessToModifiedClosure
+                timer?.Change(50, Timeout.Infinite);
             }, null, 0, Timeout.Infinite);
         }
 
@@ -426,7 +427,7 @@ namespace osu.Framework.Logging
         {
             lock (flush_sync_lock)
             {
-                writer_idle.WaitOne(500);
+                writer_idle.WaitOne(2000);
                 NewEntry = null;
             }
         }

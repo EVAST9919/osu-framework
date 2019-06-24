@@ -25,9 +25,9 @@ namespace osu.Framework.Input.Handlers.Joystick
 
         public override bool Initialize(GameHost host)
         {
-            Enabled.BindValueChanged(enabled =>
+            Enabled.BindValueChanged(e =>
             {
-                if (enabled)
+                if (e.NewValue)
                 {
                     host.InputThread.Scheduler.Add(scheduledRefreshDevices = new ScheduledDelegate(refreshDevices, 0, 500));
 
@@ -80,6 +80,7 @@ namespace osu.Framework.Input.Handlers.Joystick
             for (int index = 0; index < rawStates.Count; index++)
             {
                 var rawState = rawStates[index];
+
                 if (index < devices.Count)
                 {
                     devices[index].UpdateRawState(rawState);

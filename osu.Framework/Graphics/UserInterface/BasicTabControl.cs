@@ -18,9 +18,8 @@ namespace osu.Framework.Graphics.UserInterface
         {
             private readonly SpriteText text;
 
-            public override bool IsRemovable => true;
-
-            public BasicTabItem(T value) : base(value)
+            public BasicTabItem(T value)
+                : base(value)
             {
                 AutoSizeAxes = Axes.Both;
 
@@ -28,7 +27,7 @@ namespace osu.Framework.Graphics.UserInterface
                 {
                     Margin = new MarginPadding(2),
                     Text = value.ToString(),
-                    TextSize = 18
+                    Font = new FontUsage(size: 18),
                 });
             }
 
