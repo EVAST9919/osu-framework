@@ -35,8 +35,8 @@ using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.IO.File;
 using osu.Framework.IO.Stores;
+using SixLabors.Memory;
 
 namespace osu.Framework.Platform
 {
@@ -85,6 +85,11 @@ namespace osu.Framework.Platform
         /// Whether this host can exit (mobile platforms, for instance, do not support exiting the app).
         /// </summary>
         public virtual bool CanExit => true;
+
+        /// <summary>
+        /// Whether memory constraints should be considered before performance concerns.
+        /// </summary>
+        protected virtual bool LimitedMemoryEnvironment => false;
 
         protected void OnMessageReceived(IpcMessage message) => MessageReceived?.Invoke(message);
 
@@ -192,6 +197,16 @@ namespace osu.Framework.Platform
         {
             this.toolkitOptions = toolkitOptions;
             Name = gameName;
+        }
+
+        /// <summary>
+        /// Performs a GC collection and frees all framework caches.
+        /// This is a blocking call and should not be invoked during periods of user activity unless memory is critical.
+        /// </summary>
+        public void Collect()
+        {
+            SixLabors.ImageSharp.Configuration.Default.MemoryAllocator.ReleaseRetainedResources();
+            GC.Collect();
         }
 
         private void unhandledExceptionHandler(object sender, UnhandledExceptionEventArgs args)
@@ -435,10 +450,19 @@ namespace osu.Framework.Platform
             Window?.Close();
             stopAllThreads();
             ExecutionState = ExecutionState.Stopped;
+            stoppedEvent.Set();
         }
 
         public void Run(Game game)
         {
+            GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
+
+            if (LimitedMemoryEnvironment)
+            {
+                // recommended middle-ground https://github.com/SixLabors/docs/blob/master/articles/ImageSharp/MemoryManagement.md#working-in-memory-constrained-environments
+                SixLabors.ImageSharp.Configuration.Default.MemoryAllocator = ArrayPoolMemoryAllocator.CreateWithModeratePooling();
+            }
+
             DebugUtils.HostAssembly = game.GetType().Assembly;
 
             if (ExecutionState != ExecutionState.Idle)
@@ -467,8 +491,6 @@ namespace osu.Framework.Platform
 
                 Trace.Listeners.Clear();
                 Trace.Listeners.Add(new ThrowingTraceListener());
-
-                FileSafety.DeleteCleanupDirectory();
 
                 var assembly = DebugUtils.GetEntryAssembly();
                 string assemblyPath = DebugUtils.GetEntryPath();
@@ -509,8 +531,6 @@ namespace osu.Framework.Platform
 
                 IsActive.BindValueChanged(active =>
                 {
-                    activeGCMode.TriggerChange();
-
                     if (active.NewValue)
                         OnActivated();
                     else
@@ -601,7 +621,11 @@ namespace osu.Framework.Platform
             {
                 Child = new FrameworkActionContainer
                 {
-                    Child = game
+                    Child = new SafeAreaDefiningContainer
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Child = game
+                    }
                 }
             };
 
@@ -659,8 +683,6 @@ namespace osu.Framework.Platform
 
         private Bindable<bool> bypassFrontToBackPass;
 
-        private Bindable<GCLatencyMode> activeGCMode;
-
         private Bindable<FrameSync> frameSyncMode;
 
         private Bindable<string> ignoredInputHandlers;
@@ -697,9 +719,6 @@ namespace osu.Framework.Platform
                 if (!Window.SupportedWindowModes.Contains(mode.NewValue))
                     windowMode.Value = Window.DefaultWindowMode;
             }, true);
-
-            activeGCMode = DebugConfig.GetBindable<GCLatencyMode>(DebugSetting.ActiveGCMode);
-            activeGCMode.ValueChanged += e => { GCSettings.LatencyMode = IsActive.Value ? e.NewValue : GCLatencyMode.Interactive; };
 
             frameSyncMode = Config.GetBindable<FrameSync>(FrameworkSetting.FrameSync);
             frameSyncMode.ValueChanged += e =>
@@ -798,6 +817,8 @@ namespace osu.Framework.Platform
 
         private bool isDisposed;
 
+        private readonly ManualResetEventSlim stoppedEvent = new ManualResetEventSlim(false);
+
         protected virtual void Dispose(bool disposing)
         {
             if (isDisposed)
@@ -809,14 +830,15 @@ namespace osu.Framework.Platform
                 throw new InvalidOperationException($"{nameof(Exit)} must be called before the {nameof(GameHost)} is disposed.");
 
             // Delay disposal until the game has exited
-            while (ExecutionState > ExecutionState.Stopped)
-                Thread.Sleep(10);
+            stoppedEvent.Wait();
 
             AppDomain.CurrentDomain.UnhandledException -= unhandledExceptionHandler;
             TaskScheduler.UnobservedTaskException -= unobservedExceptionHandler;
 
             Root?.Dispose();
             Root = null;
+
+            stoppedEvent.Dispose();
 
             Config?.Dispose();
             DebugConfig?.Dispose();
@@ -858,7 +880,6 @@ namespace osu.Framework.Platform
             new KeyBinding(new KeyCombination(new[] { InputKey.Shift, InputKey.Left }), new PlatformAction(PlatformActionType.CharPrevious, PlatformActionMethod.Select)),
             new KeyBinding(new KeyCombination(new[] { InputKey.Shift, InputKey.Right }), new PlatformAction(PlatformActionType.CharNext, PlatformActionMethod.Select)),
             new KeyBinding(new KeyCombination(new[] { InputKey.Shift, InputKey.BackSpace }), new PlatformAction(PlatformActionType.CharPrevious, PlatformActionMethod.Delete)),
-            new KeyBinding(new KeyCombination(new[] { InputKey.Shift, InputKey.Delete }), new PlatformAction(PlatformActionType.CharPrevious, PlatformActionMethod.Delete)),
             new KeyBinding(new KeyCombination(new[] { InputKey.Control, InputKey.Left }), new PlatformAction(PlatformActionType.WordPrevious, PlatformActionMethod.Move)),
             new KeyBinding(new KeyCombination(new[] { InputKey.Control, InputKey.Right }), new PlatformAction(PlatformActionType.WordNext, PlatformActionMethod.Move)),
             new KeyBinding(new KeyCombination(new[] { InputKey.Control, InputKey.BackSpace }), new PlatformAction(PlatformActionType.WordPrevious, PlatformActionMethod.Delete)),
