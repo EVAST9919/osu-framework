@@ -4,8 +4,8 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Caching;
 using osu.Framework.Graphics.Primitives;
+using osu.Framework.Layout;
 
 namespace osu.Framework.Graphics.Containers
 {
@@ -16,6 +16,11 @@ namespace osu.Framework.Graphics.Containers
     public class SafeAreaContainer : Container
     {
         private readonly BindableSafeArea safeAreaPadding = new BindableSafeArea();
+
+        public SafeAreaContainer()
+        {
+            AddLayout(PaddingCache);
+        }
 
         [BackgroundDependencyLoader]
         private void load()
@@ -31,17 +36,19 @@ namespace osu.Framework.Graphics.Containers
         /// The <see cref="Edges"/> that should bypass the defined <see cref="ISafeArea" /> to bleed to the screen edge.
         /// Defaults to <see cref="Edges.None"/>.
         /// </summary>
-        public Edges SafeAreaOverrideEdges { get; set; } = Edges.None;
-
-        protected readonly Cached PaddingCache = new Cached();
-
-        public override bool Invalidate(Invalidation invalidation = Invalidation.All, Drawable source = null, bool shallPropagate = true)
+        public Edges SafeAreaOverrideEdges
         {
-            if (invalidation.HasFlag(Invalidation.Parent))
+            get => safeAreaOverrideEdges;
+            set
+            {
+                safeAreaOverrideEdges = value;
                 PaddingCache.Invalidate();
-
-            return base.Invalidate(invalidation, source, shallPropagate);
+            }
         }
+
+        private Edges safeAreaOverrideEdges = Edges.None;
+
+        protected readonly LayoutValue PaddingCache = new LayoutValue(Invalidation.DrawInfo | Invalidation.RequiredParentSizeToFit);
 
         protected override void UpdateAfterChildrenLife()
         {
@@ -69,10 +76,10 @@ namespace osu.Framework.Graphics.Containers
 
             return new MarginPadding
             {
-                Left = SafeAreaOverrideEdges.HasFlag(Edges.Left) ? nonSafeLocalSpace.TopLeft.X : Math.Max(0, localTopLeft.X),
-                Right = SafeAreaOverrideEdges.HasFlag(Edges.Right) ? DrawRectangle.BottomRight.X - nonSafeLocalSpace.BottomRight.X : Math.Max(0, DrawSize.X - localBottomRight.X),
-                Top = SafeAreaOverrideEdges.HasFlag(Edges.Top) ? nonSafeLocalSpace.TopLeft.Y : Math.Max(0, localTopLeft.Y),
-                Bottom = SafeAreaOverrideEdges.HasFlag(Edges.Bottom) ? DrawRectangle.BottomRight.Y - nonSafeLocalSpace.BottomRight.Y : Math.Max(0, DrawSize.Y - localBottomRight.Y)
+                Left = SafeAreaOverrideEdges.HasFlag(Edges.Left) ? nonSafeLocalSpace.TopLeft.X : Math.Clamp(localTopLeft.X, 0, DrawSize.X),
+                Right = SafeAreaOverrideEdges.HasFlag(Edges.Right) ? DrawRectangle.BottomRight.X - nonSafeLocalSpace.BottomRight.X : Math.Clamp(DrawSize.X - localBottomRight.X, 0, DrawSize.X),
+                Top = SafeAreaOverrideEdges.HasFlag(Edges.Top) ? nonSafeLocalSpace.TopLeft.Y : Math.Clamp(localTopLeft.Y, 0, DrawSize.Y),
+                Bottom = SafeAreaOverrideEdges.HasFlag(Edges.Bottom) ? DrawRectangle.BottomRight.Y - nonSafeLocalSpace.BottomRight.Y : Math.Clamp(DrawSize.Y - localBottomRight.Y, 0, DrawSize.Y)
             };
         }
     }

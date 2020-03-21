@@ -3,6 +3,7 @@
 
 using osu.Framework.Graphics.Containers;
 using System.Collections.Generic;
+using osuTK;
 
 namespace osu.Framework.Graphics.Animations
 {
@@ -10,7 +11,7 @@ namespace osu.Framework.Graphics.Animations
     /// Represents a generic, frame-based animation. Inherit this class if you need custom animations.
     /// </summary>
     /// <typeparam name="T">The type of content in the frames of the animation.</typeparam>
-    public abstract class Animation<T> : Container, IAnimation
+    public abstract class Animation<T> : CompositeDrawable, IAnimation
     {
         /// <summary>
         /// The duration in milliseconds of a newly added frame, if no duration is explicitly specified when adding the frame.
@@ -18,7 +19,6 @@ namespace osu.Framework.Graphics.Animations
         public double DefaultFrameLength = 1000.0 / 60.0;
 
         private readonly List<FrameData<T>> frameData;
-        private int currentFrameIndex;
 
         private double currentFrameTime;
 
@@ -26,6 +26,8 @@ namespace osu.Framework.Graphics.Animations
         /// The number of frames this animation has.
         /// </summary>
         public int FrameCount => frameData.Count;
+
+        public int CurrentFrameIndex { get; private set; }
 
         /// <summary>
         /// True if the animation is playing, false otherwise.
@@ -37,13 +39,44 @@ namespace osu.Framework.Graphics.Animations
         /// </summary>
         public bool Repeat { get; set; }
 
+        public T CurrentFrame => frameData[CurrentFrameIndex].Content;
+
         protected Animation()
         {
-            AutoSizeAxes = Axes.Both;
-
             frameData = new List<FrameData<T>>();
             IsPlaying = true;
             Repeat = true;
+        }
+
+        private bool hasCustomWidth;
+
+        public override float Width
+        {
+            set
+            {
+                base.Width = value;
+                hasCustomWidth = true;
+            }
+        }
+
+        private bool hasCustomHeight;
+
+        public override float Height
+        {
+            set
+            {
+                base.Height = value;
+                hasCustomHeight = true;
+            }
+        }
+
+        public override Vector2 Size
+        {
+            set
+            {
+                Width = value.X;
+                Height = value.Y;
+            }
         }
 
         /// <summary>
@@ -57,8 +90,8 @@ namespace osu.Framework.Graphics.Animations
             else if (frameIndex >= frameData.Count)
                 frameIndex = frameData.Count - 1;
 
-            currentFrameIndex = frameIndex;
-            displayFrame(currentFrameIndex);
+            CurrentFrameIndex = frameIndex;
+            updateCurrentFrame();
         }
 
         /// <summary>
@@ -81,7 +114,7 @@ namespace osu.Framework.Graphics.Animations
             OnFrameAdded(frame.Content, frame.Duration);
 
             if (frameData.Count == 1)
-                displayFrame(0);
+                updateCurrentFrame();
         }
 
         /// <summary>
@@ -104,7 +137,23 @@ namespace osu.Framework.Graphics.Animations
                 AddFrame(t.Content, t.Duration);
         }
 
-        private void displayFrame(int index) => DisplayFrame(frameData[index].Content);
+        private void updateCurrentFrame()
+        {
+            var frame = CurrentFrame;
+
+            if (RelativeSizeAxes != Axes.Both)
+            {
+                var frameSize = GetFrameSize(frame);
+
+                if ((RelativeSizeAxes & Axes.X) == 0 && !hasCustomWidth)
+                    base.Width = frameSize.X;
+
+                if ((RelativeSizeAxes & Axes.Y) == 0 && !hasCustomHeight)
+                    base.Height = frameSize.Y;
+            }
+
+            DisplayFrame(frame);
+        }
 
         /// <summary>
         /// Displays the given contents.
@@ -122,6 +171,13 @@ namespace osu.Framework.Graphics.Animations
         {
         }
 
+        /// <summary>
+        /// Retrieves the size of a given frame.
+        /// </summary>
+        /// <param name="content">The frame to retrieve the size of.</param>
+        /// <returns>The size of <paramref name="content"/>.</returns>
+        protected abstract Vector2 GetFrameSize(T content);
+
         protected override void Update()
         {
             base.Update();
@@ -130,27 +186,27 @@ namespace osu.Framework.Graphics.Animations
             {
                 currentFrameTime += Time.Elapsed;
 
-                while (currentFrameTime > frameData[currentFrameIndex].Duration)
+                while (currentFrameTime > frameData[CurrentFrameIndex].Duration)
                 {
-                    currentFrameTime -= frameData[currentFrameIndex].Duration;
-                    ++currentFrameIndex;
+                    currentFrameTime -= frameData[CurrentFrameIndex].Duration;
+                    ++CurrentFrameIndex;
 
-                    if (currentFrameIndex >= frameData.Count)
+                    if (CurrentFrameIndex >= frameData.Count)
                     {
                         if (Repeat)
                         {
-                            currentFrameIndex = 0;
+                            CurrentFrameIndex = 0;
                         }
                         else
                         {
-                            currentFrameIndex = frameData.Count - 1;
+                            CurrentFrameIndex = frameData.Count - 1;
                             IsPlaying = false;
                             break;
                         }
                     }
                 }
 
-                displayFrame(currentFrameIndex);
+                updateCurrentFrame();
             }
         }
     }

@@ -8,9 +8,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shaders;
-using osu.Framework.MathUtils;
-using osu.Framework.Caching;
+using osu.Framework.Utils;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Layout;
 
 namespace osu.Framework.Graphics.Containers
 {
@@ -119,11 +119,11 @@ namespace osu.Framework.Graphics.Containers
             }
         }
 
-        private BlendingParameters effectBlending;
+        private BlendingParameters effectBlending = BlendingParameters.Inherit;
 
         /// <summary>
-        /// The <see cref="BlendingParameters"/> to use after applying all effects. Default is <see cref="BlendingMode.Inherit"/>.
-        /// <see cref="BlendingMode.Inherit"/> inherits the blending mode of the original, i.e. <see cref="Drawable.Blending"/> is used.
+        /// The <see cref="BlendingParameters"/> to use after applying all effects. Default is <see cref="BlendingType.Inherit"/>.
+        /// <see cref="BlendingType.Inherit"/> inherits the blending mode of the original, i.e. <see cref="Drawable.Blending"/> is used.
         /// Does not affect the original which is drawn when <see cref="DrawOriginal"/> is true.
         /// </summary>
         public BlendingParameters EffectBlending
@@ -131,7 +131,7 @@ namespace osu.Framework.Graphics.Containers
             get => effectBlending;
             set
             {
-                if (effectBlending.Equals(value))
+                if (effectBlending == value)
                     return;
 
                 effectBlending = value;
@@ -176,6 +176,21 @@ namespace osu.Framework.Graphics.Containers
             }
         }
 
+        private Vector2 frameBufferScale = Vector2.One;
+
+        public Vector2 FrameBufferScale
+        {
+            get => frameBufferScale;
+            set
+            {
+                if (frameBufferScale == value)
+                    return;
+
+                frameBufferScale = value;
+                ForceRedraw();
+            }
+        }
+
         /// <summary>
         /// Whether the rendered framebuffer shall be cached until <see cref="ForceRedraw"/> is called
         /// or the size of the container (i.e. framebuffer) changes.
@@ -183,6 +198,24 @@ namespace osu.Framework.Graphics.Containers
         /// to calling <see cref="ForceRedraw"/> every frame.
         /// </summary>
         public bool CacheDrawnFrameBuffer;
+
+        private bool redrawOnScale = true;
+
+        /// <summary>
+        /// Whether to redraw this <see cref="BufferedContainer"/> when the draw scale changes.
+        /// </summary>
+        public bool RedrawOnScale
+        {
+            get => redrawOnScale;
+            set
+            {
+                if (redrawOnScale == value)
+                    return;
+
+                redrawOnScale = value;
+                screenSpaceSizeBacking?.Invalidate();
+            }
+        }
 
         /// <summary>
         /// Forces a redraw of the framebuffer before it is blitted the next time.
@@ -218,6 +251,8 @@ namespace osu.Framework.Graphics.Containers
         public BufferedContainer(RenderbufferInternalFormat[] formats = null, bool pixelSnapping = false)
         {
             sharedData = new BufferedContainerDrawNodeSharedData(formats, pixelSnapping);
+
+            AddLayout(screenSpaceSizeBacking);
         }
 
         [BackgroundDependencyLoader]
@@ -233,18 +268,21 @@ namespace osu.Framework.Graphics.Containers
         protected override RectangleF ComputeChildMaskingBounds(RectangleF maskingBounds) => ScreenSpaceDrawQuad.AABBFloat; // Make sure children never get masked away
 
         private Vector2 lastScreenSpaceSize;
-        private Cached screenSpaceSizeBacking = new Cached();
 
-        public override bool Invalidate(Invalidation invalidation = Invalidation.All, Drawable source = null, bool shallPropagate = true)
+        // We actually only care about Invalidation.MiscGeometry | Invalidation.DrawInfo
+        private readonly LayoutValue screenSpaceSizeBacking = new LayoutValue(Invalidation.Presence | Invalidation.RequiredParentSizeToFit | Invalidation.DrawInfo);
+
+        protected override bool OnInvalidate(Invalidation invalidation, InvalidationSource source)
         {
+            var result = base.OnInvalidate(invalidation, source);
+
             if ((invalidation & Invalidation.DrawNode) > 0)
+            {
                 ++updateVersion;
+                result = true;
+            }
 
-            // We actually only care about Invalidation.MiscGeometry | Invalidation.DrawInfo, but must match the blanket invalidation logic in Drawable.Invalidate
-            if ((invalidation & (Invalidation.Presence | Invalidation.RequiredParentSizeToFit | Invalidation.DrawInfo)) > 0)
-                screenSpaceSizeBacking.Invalidate();
-
-            return base.Invalidate(invalidation, source, shallPropagate);
+            return result;
         }
 
         private long childrenUpdateVersion = -1;
@@ -259,12 +297,18 @@ namespace osu.Framework.Graphics.Containers
                 ForceRedraw();
             else if (!screenSpaceSizeBacking.IsValid)
             {
-                var screenSpaceSize = ScreenSpaceDrawQuad.AABBFloat.Size;
+                Vector2 drawSize = ScreenSpaceDrawQuad.AABBFloat.Size;
 
-                if (!Precision.AlmostEquals(lastScreenSpaceSize, screenSpaceSize))
+                if (!RedrawOnScale)
+                {
+                    Matrix3 scaleMatrix = Matrix3.CreateScale(DrawInfo.MatrixInverse.ExtractScale());
+                    Vector2Extensions.Transform(ref drawSize, ref scaleMatrix, out drawSize);
+                }
+
+                if (!Precision.AlmostEquals(lastScreenSpaceSize, drawSize))
                 {
                     ++updateVersion;
-                    lastScreenSpaceSize = screenSpaceSize;
+                    lastScreenSpaceSize = drawSize;
                 }
 
                 screenSpaceSizeBacking.Validate();
@@ -286,14 +330,9 @@ namespace osu.Framework.Graphics.Containers
             get
             {
                 BlendingParameters blending = EffectBlending;
-                if (blending.Mode == BlendingMode.Inherit)
-                    blending.Mode = Blending.Mode;
 
-                if (blending.RGBEquation == BlendingEquation.Inherit)
-                    blending.RGBEquation = Blending.RGBEquation;
-
-                if (blending.AlphaEquation == BlendingEquation.Inherit)
-                    blending.AlphaEquation = Blending.AlphaEquation;
+                blending.CopyFromParent(Blending);
+                blending.ApplyDefaultToInherited();
 
                 return blending;
             }

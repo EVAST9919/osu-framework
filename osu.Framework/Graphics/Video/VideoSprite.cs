@@ -3,11 +3,16 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Sprites;
+using osuTK;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using JetBrains.Annotations;
+using osu.Framework.Bindables;
 using osu.Framework.Logging;
+using osu.Framework.Platform;
+using osu.Framework.Graphics.Shaders;
+using osu.Framework.Timing;
 
 namespace osu.Framework.Graphics.Video
 {
@@ -19,7 +24,7 @@ namespace osu.Framework.Graphics.Video
         /// <summary>
         /// The duration of the video that is being played. Can only be queried after the decoder has started decoding has loaded. This value may be an estimate by FFmpeg, depending on the video loaded.
         /// </summary>
-        public double Duration => decoder.Duration;
+        public double Duration => decoder?.Duration ?? 0;
 
         /// <summary>
         /// True if the video has finished playing, false otherwise.
@@ -36,9 +41,17 @@ namespace osu.Framework.Graphics.Video
         /// </summary>
         public bool Loop
         {
-            get => decoder.Looping;
-            set => decoder.Looping = value;
+            get => loop;
+            set
+            {
+                if (decoder != null)
+                    decoder.Looping = value;
+
+                loop = value;
+            }
         }
+
+        private bool loop;
 
         /// <summary>
         /// The current position of the video playback. The playback position is automatically calculated based on the clock of the VideoSprite.
@@ -48,27 +61,31 @@ namespace osu.Framework.Graphics.Video
         {
             get
             {
-                if (!startTime.HasValue)
-                    return 0;
+                if (Loop)
+                    return Clock.CurrentTime % Duration;
 
-                if (Loop) return (Clock.CurrentTime - startTime.Value) % Duration;
-
-                return Math.Min(Clock.CurrentTime - startTime.Value, Duration);
+                return Math.Min(Clock.CurrentTime, Duration);
             }
         }
 
         /// <summary>
         /// True if this VideoSprites decoding process has faulted.
         /// </summary>
-        public bool IsFaulted => decoder.IsFaulted;
+        public bool IsFaulted => decoder?.IsFaulted ?? false;
+
+        /// <summary>
+        /// The current state of the <see cref="VideoDecoder"/>, as a bindable.
+        /// </summary>
+        public readonly IBindable<VideoDecoder.DecoderState> State = new Bindable<VideoDecoder.DecoderState>();
 
         internal double CurrentFrameTime => lastFrame?.Time ?? 0;
 
         internal int AvailableFrames => availableFrames.Count;
 
-        private double? startTime;
+        private VideoDecoder decoder;
 
-        private readonly VideoDecoder decoder;
+        private readonly Stream stream;
+        private readonly bool startAtCurrentTime;
 
         private readonly Queue<DecodedFrame> availableFrames = new Queue<DecodedFrame>();
 
@@ -86,30 +103,72 @@ namespace osu.Framework.Graphics.Video
 
         private bool isDisposed;
 
-        public VideoSprite([NotNull] Stream stream)
-        {
-            if (stream == null) throw new ArgumentNullException(nameof(stream));
+        /// <summary>
+        /// YUV->RGB conversion matrix based on the video colorspace
+        /// </summary>
+        public Matrix3 ConversionMatrix => decoder.GetConversionMatrix();
 
-            decoder = new VideoDecoder(stream);
+        protected override DrawNode CreateDrawNode() => new VideoSpriteDrawNode(this);
+
+        /// <summary>
+        /// Creates a new <see cref="VideoSprite"/>.
+        /// </summary>
+        /// <param name="filename">The video file.</param>
+        /// <param name="startAtCurrentTime">Whether the current clock time should be assumed as the 0th video frame.<br />
+        /// If <code>true</code>, the current clock time will be assumed as the 0th video frame. A custom <see cref="Clock"/> cannot be set.<br />
+        /// If <code>false</code>, a current clock time of 0 will be assumed as the 0th video frame. A custom <see cref="Clock"/> can be set.</param>
+        public VideoSprite(string filename, bool startAtCurrentTime = true)
+            : this(File.OpenRead(filename), startAtCurrentTime)
+        {
         }
 
-        public VideoSprite(string filename)
-            : this(File.OpenRead(filename))
+        /// <summary>
+        /// Creates a new <see cref="VideoSprite"/>.
+        /// </summary>
+        /// <param name="stream">The video file stream.</param>
+        /// <param name="startAtCurrentTime">Whether the current clock time should be assumed as the 0th video frame.<br />
+        /// If <code>true</code>, the current clock time will be assumed as the 0th video frame. A custom <see cref="Clock"/> cannot be set.<br />
+        /// If <code>false</code>, a current clock time of 0 will be assumed as the 0th video frame. A custom <see cref="Clock"/> can be set.</param>
+        public VideoSprite([NotNull] Stream stream, bool startAtCurrentTime = true)
         {
+            this.stream = stream ?? throw new ArgumentNullException(nameof(stream));
+            this.startAtCurrentTime = startAtCurrentTime;
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(GameHost gameHost, ShaderManager shaders)
         {
+            TextureShader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.VIDEO);
+            RoundedTextureShader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.VIDEO_ROUNDED);
+            decoder = gameHost.CreateVideoDecoder(stream, Scheduler);
+            decoder.Looping = Loop;
+            State.BindTo(decoder.State);
             decoder.StartDecoding();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (startAtCurrentTime)
+                base.Clock = new FramedOffsetClock(Clock) { Offset = Clock.CurrentTime };
+        }
+
+        public override IFrameBasedClock Clock
+        {
+            get => base.Clock;
+            set
+            {
+                if (startAtCurrentTime)
+                    throw new InvalidOperationException($"A {nameof(VideoSprite)} with {startAtCurrentTime} = true cannot receive a custom {nameof(Clock)}.");
+
+                base.Clock = value;
+            }
         }
 
         protected override void Update()
         {
             base.Update();
-
-            if (!startTime.HasValue)
-                startTime = Clock.CurrentTime;
 
             var nextFrame = availableFrames.Count > 0 ? availableFrames.Peek() : null;
 
@@ -137,12 +196,19 @@ namespace osu.Framework.Graphics.Video
             {
                 if (lastFrame != null) decoder.ReturnFrames(new[] { lastFrame });
                 lastFrame = availableFrames.Dequeue();
-                Texture = lastFrame.Texture;
+
+                var tex = lastFrame.Texture;
+
+                // Check if the new frame has been uploaded so we don't display an old frame
+                if ((tex?.TextureGL as VideoTexture)?.UploadComplete ?? false)
+                    Texture = tex;
             }
 
             if (availableFrames.Count == 0)
+            {
                 foreach (var f in decoder.GetDecodedFrames())
                     availableFrames.Enqueue(f);
+            }
 
             Buffering = decoder.IsRunning && availableFrames.Count == 0;
 
@@ -158,7 +224,7 @@ namespace osu.Framework.Graphics.Video
             base.Dispose(isDisposing);
 
             isDisposed = true;
-            decoder.Dispose();
+            decoder?.Dispose();
 
             foreach (var f in availableFrames)
                 f.Texture.Dispose();
