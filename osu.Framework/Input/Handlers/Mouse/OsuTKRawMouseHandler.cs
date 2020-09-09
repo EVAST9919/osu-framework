@@ -20,7 +20,6 @@ namespace osu.Framework.Input.Handlers.Mouse
 
         public BindableDouble Sensitivity { get; } = new BindableDouble(1) { MinValue = 0.1, MaxValue = 10 };
 
-        private readonly Bindable<ConfineMouseMode> confineMode = new Bindable<ConfineMouseMode>();
         private readonly Bindable<WindowMode> windowMode = new Bindable<WindowMode>();
         private readonly BindableBool mapAbsoluteInputToWindow = new BindableBool();
 
@@ -35,7 +34,6 @@ namespace osu.Framework.Input.Handlers.Mouse
             // Get the bindables we need to determine whether to confine the mouse to window or not
             if (host.Window is DesktopGameWindow desktopWindow)
             {
-                confineMode.BindTo(desktopWindow.ConfineMouseMode);
                 windowMode.BindTo(desktopWindow.WindowMode);
                 mapAbsoluteInputToWindow.BindTo(desktopWindow.MapAbsoluteInputToWindow);
             }
@@ -46,7 +44,7 @@ namespace osu.Framework.Input.Handlers.Mouse
                 {
                     host.InputThread.Scheduler.Add(scheduled = new ScheduledDelegate(delegate
                     {
-                        if (!host.Window.Visible || host.Window.WindowState == WindowState.Minimized)
+                        if (!host.Window.Visible || host.Window.WindowState == osuTK.WindowState.Minimized)
                             return;
 
                         if ((MouseInWindow || lastEachDeviceStates.Any(s => s != null && s.Buttons.HasAnyButtonPressed)) && host.Window.Focused)

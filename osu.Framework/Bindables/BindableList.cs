@@ -14,18 +14,6 @@ namespace osu.Framework.Bindables
     public class BindableList<T> : IBindableList<T>, IList<T>, IList
     {
         /// <summary>
-        /// An event which is raised when any items are added to this <see cref="BindableList{T}"/>.
-        /// </summary>
-        [Obsolete("Use CollectionChanged instead.")]
-        public event Action<IEnumerable<T>> ItemsAdded;
-
-        /// <summary>
-        /// An event which is raised when any items are removed from this <see cref="BindableList{T}"/>.
-        /// </summary>
-        [Obsolete("Use CollectionChanged instead.")]
-        public event Action<IEnumerable<T>> ItemsRemoved;
-
-        /// <summary>
         /// An event which is raised when this <see cref="BindableList{T}"/> changes.
         /// </summary>
         public event NotifyCollectionChangedEventHandler CollectionChanged;
@@ -211,6 +199,10 @@ namespace osu.Framework.Bindables
             if (index < 0)
                 return false;
 
+            // Removal may have come from an equality comparison.
+            // Always return the original reference from the list to other bindings and events.
+            var listItem = collection[index];
+
             collection.RemoveAt(index);
 
             if (bindings != null)
@@ -220,11 +212,11 @@ namespace osu.Framework.Bindables
                     // prevent re-adding the item back to the callee.
                     // That would result in a <see cref="StackOverflowException"/>.
                     if (b != caller)
-                        b.remove(item, this);
+                        b.remove(listItem, this);
                 }
             }
 
-            notifyCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
+            notifyCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, listItem, index));
 
             return true;
         }
@@ -306,6 +298,8 @@ namespace osu.Framework.Bindables
             ensureMutationAllowed();
 
             var removed = collection.FindAll(match);
+
+            if (removed.Count == 0) return removed.Count;
 
             // RemoveAll is internally optimised
             collection.RemoveAll(match);
@@ -456,11 +450,6 @@ namespace osu.Framework.Bindables
 
         public void UnbindEvents()
         {
-#pragma warning disable 618 // can be removed 20200817
-            ItemsAdded = null;
-            ItemsRemoved = null;
-#pragma warning restore 618
-
             CollectionChanged = null;
             DisabledChanged = null;
         }
@@ -611,9 +600,7 @@ namespace osu.Framework.Bindables
 
         private void addWeakReference(WeakReference<BindableList<T>> weakReference)
         {
-            if (bindings == null)
-                bindings = new LockedWeakList<BindableList<T>>();
-
+            bindings ??= new LockedWeakList<BindableList<T>>();
             bindings.Add(weakReference);
         }
 
@@ -630,7 +617,7 @@ namespace osu.Framework.Bindables
         /// <returns>The created instance.</returns>
         public BindableList<T> GetBoundCopy()
         {
-            var copy = (BindableList<T>)Activator.CreateInstance(GetType(), new object[] { null });
+            var copy = new BindableList<T>();
             copy.BindTo(this);
             return copy;
         }
@@ -647,32 +634,7 @@ namespace osu.Framework.Bindables
 
         #endregion IEnumerable
 
-        private void notifyCollectionChanged(NotifyCollectionChangedEventArgs args)
-        {
-#pragma warning disable 618 // can be removed 20200817
-            switch (args.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                    ItemsAdded?.Invoke(args.NewItems.Cast<T>());
-                    break;
-
-                case NotifyCollectionChangedAction.Replace:
-                case NotifyCollectionChangedAction.Move:
-                    ItemsRemoved?.Invoke(args.OldItems.Cast<T>());
-                    ItemsAdded?.Invoke(args.NewItems.Cast<T>());
-                    break;
-
-                case NotifyCollectionChangedAction.Remove:
-                    ItemsRemoved?.Invoke(args.OldItems.Cast<T>());
-                    break;
-
-                case NotifyCollectionChangedAction.Reset:
-                    break;
-            }
-#pragma warning restore 618
-
-            CollectionChanged?.Invoke(this, args);
-        }
+        private void notifyCollectionChanged(NotifyCollectionChangedEventArgs args) => CollectionChanged?.Invoke(this, args);
 
         private void ensureMutationAllowed()
         {

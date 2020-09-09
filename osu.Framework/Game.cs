@@ -60,7 +60,7 @@ namespace osu.Framework
 
         private DrawVisualiser drawVisualiser;
 
-        private TextureAtlasVisualiser atlasVisualiser;
+        private TextureVisualiser textureVisualiser;
 
         private LogOverlay logOverlay;
 
@@ -75,6 +75,14 @@ namespace osu.Framework
         /// </remarks>
         /// </summary>
         protected internal virtual IDictionary<FrameworkSetting, object> GetFrameworkConfigDefaults() => null;
+
+        /// <summary>
+        /// Creates the <see cref="Storage"/> where this <see cref="Game"/> will reside.
+        /// </summary>
+        /// <param name="host">The <see cref="GameHost"/>.</param>
+        /// <param name="defaultStorage">The default <see cref="Storage"/> to be used if a custom <see cref="Storage"/> isn't desired.</param>
+        /// <returns>The <see cref="Storage"/>.</returns>
+        protected internal virtual Storage CreateStorage(GameHost host, Storage defaultStorage) => defaultStorage;
 
         protected Game()
         {
@@ -195,8 +203,9 @@ namespace osu.Framework
         /// </summary>
         /// <param name="store">The backing store with font resources.</param>
         /// <param name="assetName">The base name of the font.</param>
-        public void AddFont(ResourceStore<byte[]> store, string assetName = null)
-            => addFont(Fonts, store, assetName);
+        /// <param name="target">An optional target store to add the font to. If not specified, <see cref="Fonts"/> is used.</param>
+        public void AddFont(ResourceStore<byte[]> store, string assetName = null, FontStore target = null)
+            => addFont(target ?? Fonts, store, assetName);
 
         private void addFont(FontStore target, ResourceStore<byte[]> store, string assetName = null)
             => target.AddStore(new RawCachingGlyphStore(store, assetName, Host.CreateTextureLoaderStore(store)));
@@ -284,16 +293,16 @@ namespace osu.Framework
 
                 case FrameworkAction.ToggleAtlasVisualiser:
 
-                    if (atlasVisualiser == null)
+                    if (textureVisualiser == null)
                     {
-                        LoadComponentAsync(atlasVisualiser = new TextureAtlasVisualiser
+                        LoadComponentAsync(textureVisualiser = new TextureVisualiser
                         {
                             Position = new Vector2(100 + 2 * ToolWindow.WIDTH, 100),
                             Depth = float.MinValue / 2,
                         }, AddInternal);
                     }
 
-                    atlasVisualiser.ToggleVisibility();
+                    textureVisualiser.ToggleVisibility();
                     return true;
 
                 case FrameworkAction.ToggleLogOverlay:
@@ -342,10 +351,23 @@ namespace osu.Framework
 
         protected override void Dispose(bool isDisposing)
         {
+            // ensure any async disposals are completed before we begin to rip components out.
+            // if we were to not wait, async disposals may throw unexpected exceptions.
+            AsyncDisposalQueue.WaitForEmpty();
+
+            base.Dispose(isDisposing);
+
+            // call a second time to protect against anything being potentially async disposed in the base.Dispose call.
+            AsyncDisposalQueue.WaitForEmpty();
+
             Audio?.Dispose();
             Audio = null;
 
-            base.Dispose(isDisposing);
+            Fonts?.Dispose();
+            Fonts = null;
+
+            localFonts?.Dispose();
+            localFonts = null;
         }
     }
 }

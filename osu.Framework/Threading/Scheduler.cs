@@ -32,7 +32,7 @@ namespace osu.Framework.Threading
         public bool HasPendingTasks => runQueue.Count > 0 || timedTasks.Count > 0 || perUpdateTasks.Count > 0;
 
         /// <summary>
-        /// The base thread is assumed to be the the thread on which the constructor is run.
+        /// The base thread is assumed to be the thread on which the constructor is run.
         /// </summary>
         public Scheduler()
         {
@@ -43,7 +43,7 @@ namespace osu.Framework.Threading
         }
 
         /// <summary>
-        /// The base thread is assumed to be the the thread on which the constructor is run.
+        /// The base thread is assumed to be the thread on which the constructor is run.
         /// </summary>
         public Scheduler(Func<bool> isCurrentThread, IClock clock)
         {
@@ -84,7 +84,7 @@ namespace osu.Framework.Threading
         /// <summary>
         /// Run any pending work tasks.
         /// </summary>
-        /// <returns>true if any tasks were run.</returns>
+        /// <returns>The number of tasks that were run.</returns>
         public virtual int Update()
         {
             lock (queueLock)

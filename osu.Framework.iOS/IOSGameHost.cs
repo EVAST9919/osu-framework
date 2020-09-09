@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -6,13 +6,13 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using Foundation;
-using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Graphics.Video;
 using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Handlers;
+using osu.Framework.Input.Handlers.Midi;
 using osu.Framework.IO.Stores;
 using osu.Framework.iOS.Graphics.Textures;
 using osu.Framework.iOS.Graphics.Video;
@@ -67,8 +67,8 @@ namespace osu.Framework.iOS
             IOSGameWindow.GameView = gameView;
 
             AllowScreenSuspension.BindValueChanged(allow =>
-                InputThread.Scheduler.Add(() => UIApplication.SharedApplication.IdleTimerDisabled = !allow.NewValue),
-            true);
+                    InputThread.Scheduler.Add(() => UIApplication.SharedApplication.IdleTimerDisabled = !allow.NewValue),
+                true);
         }
 
         protected override IWindow CreateWindow() => new IOSGameWindow();
@@ -97,9 +97,18 @@ namespace osu.Framework.iOS
         public override ITextInputSource GetTextInput() => new IOSTextInput(gameView);
 
         protected override IEnumerable<InputHandler> CreateAvailableInputHandlers() =>
-            new InputHandler[] { new IOSTouchHandler(gameView), keyboardHandler = new IOSKeyboardHandler(gameView), rawKeyboardHandler = new IOSRawKeyboardHandler() };
+            new InputHandler[]
+            {
+                new IOSTouchHandler(gameView),
+                keyboardHandler = new IOSKeyboardHandler(gameView),
+                rawKeyboardHandler = new IOSRawKeyboardHandler(),
+                new IOSMouseHandler(gameView),
+                new MidiInputHandler()
+            };
 
-        protected override Storage GetStorage(string baseName) => new IOSStorage(baseName, this);
+        public override Storage GetStorage(string path) => new IOSStorage(path, this);
+
+        public override string UserStoragePath => Environment.GetFolderPath(Environment.SpecialFolder.Personal);
 
         public override void OpenFileExternally(string filename) => throw new NotImplementedException();
 

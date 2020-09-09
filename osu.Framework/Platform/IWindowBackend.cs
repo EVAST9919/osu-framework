@@ -3,9 +3,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.Numerics;
+using System.Drawing;
 using osu.Framework.Input.StateChanges;
-using Veldrid;
 
 namespace osu.Framework.Platform
 {
@@ -29,18 +28,17 @@ namespace osu.Framework.Platform
         /// <summary>
         /// Returns or sets the window's position in screen space.
         /// </summary>
-        Vector2 Position { get; set; }
+        Point Position { get; set; }
 
         /// <summary>
         /// Returns or sets the window's internal size, before scaling.
         /// </summary>
-        Vector2 Size { get; set; }
+        Size Size { get; set; }
 
         /// <summary>
-        /// Returns the scale of window's drawable area.
-        /// In high-dpi environments this will be greater than one.
+        /// Returns the drawable area, after scaling.
         /// </summary>
-        float Scale { get; }
+        Size ClientSize { get; }
 
         /// <summary>
         /// Returns or sets the cursor's visibility within the window.
@@ -70,16 +68,19 @@ namespace osu.Framework.Platform
         IEnumerable<Display> Displays { get; }
 
         /// <summary>
-        /// Gets the <see cref="Display"/> that this window is currently on.
-        /// Can be null if running headless.
+        /// Gets the <see cref="Display"/> that has been set as "primary" or "default" in the operating system.
         /// </summary>
-        Display Display { get; }
+        Display PrimaryDisplay { get; }
 
         /// <summary>
-        /// Gets the <see cref="DisplayMode"/> for the display that this window is currently on.
-        /// Can be null if running headless.
+        /// Gets or sets the <see cref="Display"/> that this window is currently on.
         /// </summary>
-        DisplayMode DisplayMode { get; }
+        Display CurrentDisplay { get; set; }
+
+        /// <summary>
+        /// Gets or sets the <see cref="DisplayMode"/> for the display that this window is currently on.
+        /// </summary>
+        DisplayMode CurrentDisplayMode { get; set; }
 
         #endregion
 
@@ -93,12 +94,12 @@ namespace osu.Framework.Platform
         /// <summary>
         /// Invoked after the window has resized.
         /// </summary>
-        event Action Resized;
+        event Action<Size> Resized;
 
         /// <summary>
         /// Invoked after the window's state has changed.
         /// </summary>
-        event Action WindowStateChanged;
+        event Action<WindowState> WindowStateChanged;
 
         /// <summary>
         /// Invoked when the user attempts to close the window.
@@ -143,7 +144,7 @@ namespace osu.Framework.Platform
         /// <summary>
         /// Invoked when the window moves.
         /// </summary>
-        event Action<Vector2> Moved;
+        event Action<Point> Moved;
 
         /// <summary>
         /// Invoked when the user scrolls the mouse wheel over the window.
@@ -184,6 +185,11 @@ namespace osu.Framework.Platform
         /// Invoked when the user drops a file into the window.
         /// </summary>
         event Action<string> DragDrop;
+
+        /// <summary>
+        /// Invoked when the current display changes.
+        /// </summary>
+        event Action<Display> DisplayChanged;
 
         #endregion
 

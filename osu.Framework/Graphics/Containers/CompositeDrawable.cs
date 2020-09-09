@@ -25,6 +25,7 @@ using osu.Framework.Extensions.ExceptionExtensions;
 using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Layout;
+using osu.Framework.Testing;
 using osu.Framework.Utils;
 
 namespace osu.Framework.Graphics.Containers
@@ -36,9 +37,10 @@ namespace osu.Framework.Graphics.Containers
     /// Additionally, <see cref="CompositeDrawable"/>s support various effects, such as masking, edge effect,
     /// padding, and automatic sizing depending on their children.
     /// </summary>
+    [ExcludeFromDynamicCompile]
     public abstract partial class CompositeDrawable : Drawable
     {
-        #region Contruction and disposal
+        #region Construction and disposal
 
         /// <summary>
         /// Constructs a <see cref="CompositeDrawable"/> that stores children.
@@ -142,16 +144,14 @@ namespace osu.Framework.Graphics.Containers
             if (IsDisposed)
                 throw new ObjectDisposedException(ToString());
 
-            if (disposalCancellationSource == null)
-                disposalCancellationSource = new CancellationTokenSource();
+            disposalCancellationSource ??= new CancellationTokenSource();
 
             var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(disposalCancellationSource.Token, cancellation);
 
             var deps = new DependencyContainer(Dependencies);
             deps.CacheValueAs(linkedSource.Token);
 
-            if (loadingComponents == null)
-                loadingComponents = new WeakList<Drawable>();
+            loadingComponents ??= new WeakList<Drawable>();
 
             foreach (var d in components)
             {
@@ -228,8 +228,9 @@ namespace osu.Framework.Graphics.Containers
         [BackgroundDependencyLoader(true)]
         private void load(ShaderManager shaders, CancellationToken? cancellation)
         {
-            if (Shader == null)
-                Shader = shaders?.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE_ROUNDED);
+            hasCustomDrawNode = GetType().GetMethod(nameof(CreateDrawNode))?.DeclaringType != typeof(CompositeDrawable);
+
+            Shader ??= shaders?.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE_ROUNDED);
 
             // We are in a potentially async context, so let's aggressively load all our children
             // regardless of their alive state. this also gives children a clock so they can be checked
@@ -534,12 +535,14 @@ namespace osu.Framework.Graphics.Containers
             drawable.ChildID = ++currentChildID;
             drawable.RemoveCompletedTransforms = RemoveCompletedTransforms;
 
-            if (drawable.LoadState >= LoadState.Ready)
-                drawable.Parent = this;
-            else if (LoadState >= LoadState.Loading)
+            if (LoadState >= LoadState.Loading)
             {
                 // If we're already loaded, we can eagerly allow children to be loaded
-                loadChild(drawable);
+
+                if (drawable.LoadState >= LoadState.Ready)
+                    drawable.Parent = this;
+                else
+                    loadChild(drawable);
             }
 
             internalChildren.Add(drawable);
@@ -700,7 +703,7 @@ namespace osu.Framework.Graphics.Containers
             }
             else
             {
-                if (child.IsAlive)
+                if (child.IsAlive || child.RemoveWhenNotAlive)
                 {
                     if (MakeChildDead(child))
                         state |= ChildLifeStateChange.Removed;
@@ -751,6 +754,10 @@ namespace osu.Framework.Graphics.Containers
 
             ChildBecameAlive?.Invoke(child);
 
+            // Layout invalidations on non-alive children are blocked, so they must be invalidated once when they become alive.
+            child.Invalidate(Invalidation.Layout, InvalidationSource.Parent);
+
+            // Notify ourselves that a child has become alive.
             Invalidate(Invalidation.Presence, InvalidationSource.Child);
         }
 
@@ -764,12 +771,13 @@ namespace osu.Framework.Graphics.Containers
         /// <returns>Whether <paramref name="child"/> has been removed by death.</returns>
         protected bool MakeChildDead(Drawable child)
         {
-            Debug.Assert(child.IsAlive);
+            if (child.IsAlive)
+            {
+                aliveInternalChildren.Remove(child);
+                child.IsAlive = false;
 
-            aliveInternalChildren.Remove(child);
-            child.IsAlive = false;
-
-            ChildDied?.Invoke(child);
+                ChildDied?.Invoke(child);
+            }
 
             bool removed = false;
 
@@ -783,6 +791,7 @@ namespace osu.Framework.Graphics.Containers
                 removed = true;
             }
 
+            // Notify ourselves that a child has died.
             Invalidate(Invalidation.Presence, InvalidationSource.Child);
 
             return removed;
@@ -959,9 +968,20 @@ namespace osu.Framework.Graphics.Containers
             if (source == InvalidationSource.Child)
                 return anyInvalidated;
 
-            for (int i = 0; i < internalChildren.Count; ++i)
+            // DrawNode invalidations should not propagate to children.
+            invalidation &= ~Invalidation.DrawNode;
+            if (invalidation == Invalidation.None)
+                return anyInvalidated;
+
+            IReadOnlyList<Drawable> targetChildren = aliveInternalChildren;
+
+            // Non-layout flags must be propagated to all children. As such, it is simplest + quickest to propagate all other relevant flags along with them.
+            if ((invalidation & ~Invalidation.Layout) > 0)
+                targetChildren = internalChildren;
+
+            for (int i = 0; i < targetChildren.Count; ++i)
             {
-                Drawable c = internalChildren[i];
+                Drawable c = targetChildren[i];
 
                 Invalidation childInvalidation = invalidation;
                 if ((invalidation & Invalidation.RequiredParentSizeToFit) > 0)
@@ -1009,6 +1029,8 @@ namespace osu.Framework.Graphics.Containers
 
         #region DrawNode
 
+        private bool hasCustomDrawNode;
+
         internal IShader Shader { get; private set; }
 
         protected override DrawNode CreateDrawNode() => new CompositeDrawableDrawNode(this);
@@ -1037,10 +1059,12 @@ namespace osu.Framework.Graphics.Containers
         /// In some cases, the <see cref="DrawNode"/> must always be generated and flattening should not occur.
         /// </summary>
         protected virtual bool CanBeFlattened =>
-            // Masking composite DrawNodes define the masking area for their children
+            // Masking composite DrawNodes define the masking area for their children.
             !Masking
-            // Proxied drawables have their DrawNodes drawn elsewhere in the scene graph
-            && !HasProxy;
+            // Proxied drawables have their DrawNodes drawn elsewhere in the scene graph.
+            && !HasProxy
+            // Custom draw nodes may provide custom drawing procedures.
+            && !hasCustomDrawNode;
 
         private const int amount_children_required_for_masking_check = 2;
 
@@ -1110,8 +1134,7 @@ namespace osu.Framework.Graphics.Containers
             if (!(node is ICompositeDrawNode cNode))
                 return null;
 
-            if (cNode.Children == null)
-                cNode.Children = new List<DrawNode>(aliveInternalChildren.Count);
+            cNode.Children ??= new List<DrawNode>(aliveInternalChildren.Count);
 
             if (cNode.AddChildDrawNodes)
             {
@@ -1799,7 +1822,7 @@ namespace osu.Framework.Graphics.Containers
 
         private void autoSizeResizeTo(Vector2 newSize, double duration = 0, Easing easing = Easing.None)
         {
-            var currentTransform = Transforms.Count == 0 ? null : Transforms.OfType<AutoSizeTransform>().FirstOrDefault();
+            var currentTransform = !Transforms.Any() ? null : Transforms.OfType<AutoSizeTransform>().FirstOrDefault();
 
             if ((currentTransform?.EndValue ?? Size) != newSize)
             {

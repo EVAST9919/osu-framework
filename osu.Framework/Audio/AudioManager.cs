@@ -250,8 +250,7 @@ namespace osu.Framework.Audio
                 return true;
 
             // initialize new device
-            if (!InitBass(deviceIndex) && Bass.LastError != Errors.Already)
-                return false;
+            bool initSuccess = InitBass(deviceIndex);
 
             if (Bass.LastError == Errors.Already)
             {
@@ -260,12 +259,15 @@ namespace osu.Framework.Audio
                 // other fuzz.
                 Bass.CurrentDevice = deviceIndex;
                 FreeBass();
-                InitBass(deviceIndex);
+                initSuccess = InitBass(deviceIndex);
             }
 
-            if (Bass.LastError != Errors.OK)
+            if (BassUtils.CheckFaulted(false))
+                return false;
+
+            if (!initSuccess)
             {
-                Logger.Log($@"BASS failed to initialize with error code {Bass.LastError:D}: {Bass.LastError}.", LoggingTarget.Runtime, LogLevel.Important);
+                Logger.Log("BASS failed to initialize but did not provide an error code", level: LogLevel.Error);
                 return false;
             }
 
@@ -277,9 +279,6 @@ namespace osu.Framework.Audio
 
             //we have successfully initialised a new device.
             UpdateDevice(deviceIndex);
-
-            Bass.PlaybackBufferLength = 100;
-            Bass.UpdatePeriod = 5;
 
             return true;
         }
@@ -295,6 +294,7 @@ namespace osu.Framework.Audio
 
             // reduce latency to a known sane minimum.
             Bass.Configure(ManagedBass.Configuration.DeviceBufferLength, 10);
+            Bass.Configure(ManagedBass.Configuration.PlaybackBufferLength, 100);
 
             // this likely doesn't help us but also doesn't seem to cause any issues or any cpu increase.
             Bass.Configure(ManagedBass.Configuration.UpdatePeriod, 5);

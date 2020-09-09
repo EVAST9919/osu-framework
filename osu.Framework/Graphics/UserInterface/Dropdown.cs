@@ -212,13 +212,12 @@ namespace osu.Framework.Graphics.UserInterface
             Menu.PreselectionConfirmed += preselectionConfirmed;
             Current.ValueChanged += selectionChanged;
 
-            ItemSource.ItemsAdded += _ => setItems(ItemSource);
-            ItemSource.ItemsRemoved += _ => setItems(ItemSource);
+            ItemSource.CollectionChanged += (_, __) => setItems(ItemSource);
         }
 
         private void preselectionConfirmed(int selectedIndex)
         {
-            SelectedItem = MenuItems.ElementAt(selectedIndex);
+            SelectedItem = MenuItems.ElementAtOrDefault(selectedIndex);
             Menu.State = MenuState.Closed;
         }
 
@@ -356,8 +355,8 @@ namespace osu.Framework.Graphics.UserInterface
             protected internal IEnumerable<DrawableDropdownMenuItem> DrawableMenuItems => Children.OfType<DrawableDropdownMenuItem>();
             protected internal IEnumerable<DrawableDropdownMenuItem> VisibleMenuItems => DrawableMenuItems.Where(item => !item.IsMaskedAway);
 
-            public DrawableDropdownMenuItem PreselectedItem => Children.OfType<DrawableDropdownMenuItem>().FirstOrDefault(c => c.IsPreSelected)
-                                                               ?? Children.OfType<DrawableDropdownMenuItem>().FirstOrDefault(c => c.IsSelected);
+            public DrawableDropdownMenuItem PreselectedItem => DrawableMenuItems.FirstOrDefault(c => c.IsPreSelected)
+                                                               ?? DrawableMenuItems.FirstOrDefault(c => c.IsSelected);
 
             public event Action<int> PreselectionConfirmed;
 
@@ -525,8 +524,7 @@ namespace osu.Framework.Graphics.UserInterface
                 if (!drawableMenuItemsList.Any())
                     return base.OnKeyDown(e);
 
-                var currentPreselected = drawableMenuItemsList.FirstOrDefault(i => i.IsPreSelected) ?? drawableMenuItemsList.First(i => i.IsSelected);
-
+                var currentPreselected = PreselectedItem;
                 var targetPreselectionIndex = drawableMenuItemsList.IndexOf(currentPreselected);
 
                 switch (e.Key)

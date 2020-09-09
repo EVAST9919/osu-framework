@@ -23,6 +23,7 @@ using osu.Framework.Graphics.Sprites;
 
 namespace osu.Framework.Testing
 {
+    [ExcludeFromDynamicCompile]
     [TestFixture]
     public abstract class TestScene : Container, IDynamicallyCompile
     {
@@ -36,6 +37,8 @@ namespace osu.Framework.Testing
         private GameHost host;
         private Task runTask;
         private ITestSceneTestRunner runner;
+
+        public object DynamicCompilationOriginal { get; internal set; }
 
         [OneTimeSetUp]
         public void SetupGameHost()
@@ -148,6 +151,8 @@ namespace osu.Framework.Testing
 
         protected TestScene()
         {
+            DynamicCompilationOriginal = this;
+
             Name = RemovePrefix(GetType().ReadableName());
 
             RelativeSizeAxes = Axes.Both;
@@ -388,6 +393,7 @@ namespace osu.Framework.Testing
             });
         });
 
+        [Obsolete("Required types are now determined automatically.")] // can be removed 20201115
         public virtual IReadOnlyList<Type> RequiredTypes => Array.Empty<Type>();
 
         internal void RunSetUpSteps()
