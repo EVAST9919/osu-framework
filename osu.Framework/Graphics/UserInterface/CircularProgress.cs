@@ -201,7 +201,8 @@ namespace osu.Framework.Graphics.UserInterface
                     TexelSize = texelSizeEdgeEffect,
                     RoundedCaps = roundedCaps,
                     GlowSize = glowSize,
-                    Hollow = edgeEffect.Hollow
+                    Hollow = edgeEffect.Hollow,
+                    Roundness = edgeEffect.Roundness
                 };
 
                 shader.BindUniformBlock("m_CircularProgressEdgeEffectParameters", edgeEffectParametersBuffer);
@@ -248,9 +249,9 @@ namespace osu.Framework.Graphics.UserInterface
                 public UniformFloat InnerRadius;
                 public UniformFloat Progress;
                 public UniformFloat TexelSize;
+                public UniformFloat Roundness;
                 public UniformBool RoundedCaps;
                 public UniformBool Hollow;
-                private readonly UniformPadding4 pad;
             }
         }
     }

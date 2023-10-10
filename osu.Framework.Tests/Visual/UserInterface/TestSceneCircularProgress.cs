@@ -37,6 +37,7 @@ namespace osu.Framework.Tests.Visual.UserInterface
         private float glowG = 1f;
         private float glowB = 1f;
         private float glowA = 1f;
+        private float roundness;
         private float offsetX;
         private float offsetY;
 
@@ -153,6 +154,11 @@ namespace osu.Framework.Tests.Visual.UserInterface
                 glowRadius = r;
                 updateGlow();
             });
+            AddSliderStep("Glow roundness", 0f, 1f, 0f, r =>
+            {
+                roundness = r;
+                updateGlow();
+            });
             AddSliderStep("Glow R", 0f, 1f, 1f, r =>
             {
                 glowR = r;
@@ -208,7 +214,8 @@ namespace osu.Framework.Tests.Visual.UserInterface
                 Colour = new Color4(glowR, glowG, glowB, glowA),
                 Hollow = hollow,
                 Type = type,
-                Offset = new Vector2(offsetX, offsetY)
+                Offset = new Vector2(offsetX, offsetY),
+                Roundness = roundness
             };
         }
 
