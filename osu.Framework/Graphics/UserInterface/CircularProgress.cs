@@ -89,6 +89,21 @@ namespace osu.Framework.Graphics.UserInterface
             }
         }
 
+        private float roundness;
+
+        public float Roundness
+        {
+            get => roundness;
+            set
+            {
+                if (roundness == value)
+                    return;
+
+                roundness = value;
+                Invalidate(Invalidation.DrawNode);
+            }
+        }
+
         protected class CircularProgressDrawNode : SpriteDrawNode
         {
             public new CircularProgress Source => (CircularProgress)base.Source;
@@ -101,6 +116,7 @@ namespace osu.Framework.Graphics.UserInterface
             protected float InnerRadius { get; private set; }
             protected float Progress { get; private set; }
             protected float TexelSize { get; private set; }
+            protected float Roundness { get; private set; }
             protected bool RoundedCaps { get; private set; }
 
             public override void ApplyState()
@@ -110,6 +126,7 @@ namespace osu.Framework.Graphics.UserInterface
                 InnerRadius = Source.innerRadius;
                 Progress = Math.Abs((float)Source.current.Value);
                 RoundedCaps = Source.roundedCaps;
+                Roundness = Source.roundness;
 
                 // smoothstep looks too sharp with 1px, let's give it a bit more
                 TexelSize = 1.5f / ScreenSpaceDrawQuad.Size.X;
@@ -136,6 +153,7 @@ namespace osu.Framework.Graphics.UserInterface
                     Progress = Progress,
                     TexelSize = TexelSize,
                     RoundedCaps = RoundedCaps,
+                    Roundness = Roundness
                 };
 
                 shader.BindUniformBlock("m_CircularProgressParameters", parametersBuffer);
@@ -155,7 +173,9 @@ namespace osu.Framework.Graphics.UserInterface
                 public UniformFloat InnerRadius;
                 public UniformFloat Progress;
                 public UniformFloat TexelSize;
+                public UniformFloat Roundness;
                 public UniformBool RoundedCaps;
+                private UniformPadding12 pad;
             }
         }
     }

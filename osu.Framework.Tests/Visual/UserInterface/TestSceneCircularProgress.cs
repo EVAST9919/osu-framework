@@ -136,6 +136,7 @@ namespace osu.Framework.Tests.Visual.UserInterface
             AddToggleStep("Toggle background", b => background.Alpha = b ? 1 : 0);
             AddSliderStep("Scale", 0f, 2f, 1f, s => clock.Scale = new Vector2(s));
             AddSliderStep("Fill", 0f, 1f, 0.5f, f => clock.InnerRadius = f);
+            AddSliderStep("Roundness", 0f, 1f, 0f, f => clock.Roundness = f);
         }
 
         protected override void Update()
