@@ -28,9 +28,22 @@ namespace osu.Framework.Graphics.Lines
             }
         }
 
+        public BBHNode[] Nodes
+        {
+            get
+            {
+                if (segmentCount > 0 && nodes != null)
+                    return nodes;
+
+                return null;
+            }
+        }
+
         public RectangleF VertexBounds { get; private set; } = RectangleF.Empty;
 
         public int TreeVersion { get; private set; }
+
+        public int BufferSize => lastLeafIndex;
 
         private float radius;
         private BBHNode[]? nodes;
@@ -223,7 +236,7 @@ namespace osu.Framework.Graphics.Lines
             GC.SuppressFinalize(this);
         }
 
-        private readonly struct BBHNode
+        public readonly struct BBHNode
         {
             /// <summary>
             /// Index of a left child of this <see cref="BBHNode"/> in the tree array.

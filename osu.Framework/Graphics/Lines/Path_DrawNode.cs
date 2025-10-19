@@ -12,6 +12,8 @@ using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Rendering.Vertices;
 using osu.Framework.Graphics.Shaders;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using osu.Framework.Graphics.Shaders.Types;
 using osu.Framework.Utils;
 
 namespace osu.Framework.Graphics.Lines
@@ -34,6 +36,8 @@ namespace osu.Framework.Graphics.Lines
             private int treeVersion;
 
             private IVertexBatch<TexturedVertex3D>? triangleBatch;
+            private IShaderStorageBufferObject<PathNodeData>? pathBuffer;
+            private bool remapBuffer = true;
 
             public PathDrawNode(Path source)
                 : base(source)
@@ -54,6 +58,7 @@ namespace osu.Framework.Graphics.Lines
                 {
                     segments.Clear();
                     segments.AddRange(bbh.Segments);
+                    remapBuffer = true;
 
                     treeVersion = newTreeVersion;
                 }
@@ -84,11 +89,40 @@ namespace osu.Framework.Graphics.Lines
                 // Blending is removed to allow for correct blending between the wedges of the path.
                 renderer.SetBlend(BlendingParameters.None);
 
-                pathShader.Bind();
+                if (pathBuffer == null || remapBuffer)
+                {
+                    pathBuffer = renderer.CreateShaderStorageBufferObject<PathNodeData>(64, Source.BBH.Nodes.Length);
+
+                    for (int i = 0; i < Source.BBH.Nodes.Length; i++)
+                    {
+                        var n = Source.BBH.Nodes[i];
+                        pathBuffer[i] = new PathNodeData
+                        {
+                            Left = n.Left,
+                            Right = n.Right ?? -1,
+                            IsLeaf = n.IsLeaf,
+                            SegmentStart = n.Segment?.StartPoint ?? Vector2.Zero,
+                            SegmentEnd = n.Segment?.EndPoint ?? Vector2.Zero,
+                            Bounds = new UniformVector4
+                            {
+                                X = n.Bounds.Left,
+                                Y = n.Bounds.Top,
+                                Z = n.Bounds.Right,
+                                W = n.Bounds.Bottom
+                            }
+                        };
+                    }
+
+                    remapBuffer = false;
+                }
 
                 texture.Bind();
+                pathShader.Bind();
+                pathShader.BindUniformBlock("g_PathBuffer", pathBuffer);
 
-                updateVertexBuffer();
+                renderer.DrawQuad(texture, (Quad)(Source.BBH.Nodes?[0].Bounds ?? new RectangleF(0, 0, 0, 0)), DrawColourInfo.Colour);
+
+                //updateVertexBuffer();
 
                 pathShader.Unbind();
 
@@ -103,6 +137,18 @@ namespace osu.Framework.Graphics.Lines
             private Color4 colourAt(Vector2 localPos) => DrawColourInfo.Colour.TryExtractSingleColour(out SRGBColour colour)
                 ? colour.SRGB
                 : DrawColourInfo.Colour.Interpolate(relativePosition(localPos)).SRGB;
+
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            private record struct PathNodeData
+            {
+                public UniformInt Left;
+                public UniformInt Right;
+                public UniformBool IsLeaf;
+                public UniformPadding4 Pad1;
+                public UniformVector2 SegmentStart;
+                public UniformVector2 SegmentEnd;
+                public UniformVector4 Bounds;
+            }
 
             private void addSegmentQuads(SegmentWithThickness segment, RectangleF texRect)
             {

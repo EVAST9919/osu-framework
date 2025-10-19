@@ -35,7 +35,7 @@ namespace osu.Framework.Graphics.Lines
         private void load(ShaderManager shaders)
         {
             TextureShader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE);
-            pathShader = shaders.Load(VertexShaderDescriptor.TEXTURE_3, FragmentShaderDescriptor.TEXTURE);
+            pathShader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, "Path");
         }
 
         private readonly List<Vector2> vertices = new List<Vector2>();
