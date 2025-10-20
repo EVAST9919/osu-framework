@@ -125,12 +125,15 @@ namespace osu.Framework.Graphics.Lines
                 pathData ??= renderer.CreateUniformBuffer<PathData>();
                 pathData.Data = new PathData
                 {
-                    PathRadius = radius
+                    PathRadius = radius,
+                    VertexBounds = new Vector4(Source.BBH.VertexBounds.Left, Source.BBH.VertexBounds.Top, Source.BBH.VertexBounds.Right, Source.BBH.VertexBounds.Bottom)
                 };
 
                 pathShader.BindUniformBlock("m_PathData", pathData);
 
-                renderer.DrawQuad(texture, (Quad)(Source.BBH.Nodes?[0].Bounds ?? new RectangleF(0, 0, 0, 0)), DrawColourInfo.Colour);
+                Quad drawQuad = new Quad(0, 0, Source.BBH.VertexBounds.Width, Source.BBH.VertexBounds.Height);
+
+                renderer.DrawQuad(texture, drawQuad, DrawColourInfo.Colour);
 
                 //updateVertexBuffer();
 
@@ -165,6 +168,7 @@ namespace osu.Framework.Graphics.Lines
             {
                 public UniformFloat PathRadius;
                 private UniformPadding12 pad;
+                public UniformVector4 VertexBounds;
             }
 
             private void addSegmentQuads(SegmentWithThickness segment, RectangleF texRect)

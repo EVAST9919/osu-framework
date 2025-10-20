@@ -32,12 +32,15 @@ layout(std140, set = 0, binding = 0) uniform g_PathBuffer
 
 #endif // OSU_GRAPHICS_NO_SSBO
 
-layout(std140, set = 1, binding = 0) uniform m_PathData
+layout(std140, set = 2, binding = 0) uniform m_PathData
 {
     float PathRadius;
+    vec4 VertexBounds;
 };
 
 layout(location = 2) in highp vec2 v_TexCoord;
+layout(set = 1, binding = 0) uniform lowp texture2D m_Texture;
+layout(set = 1, binding = 1) uniform lowp sampler m_Sampler;
 
 layout(location = 0) out vec4 o_Colour;
 
@@ -60,9 +63,9 @@ bool contains(vec2 pixelPos, int index)
     return pixelPos.x > PathBuffer.Data[index].Bounds.x && pixelPos.x < PathBuffer.Data[index].Bounds.z && pixelPos.y > PathBuffer.Data[index].Bounds.y && pixelPos.y < PathBuffer.Data[index].Bounds.w;
 }
 
-float dst(vec2 pixelPos)
+highp float dst(vec2 pixelPos)
 {
-    float m = 100.0;
+    highp float m = 100.0;
 
     int stack[25];
     stack[0] = 0;
@@ -98,10 +101,18 @@ void main(void)
 {
     highp vec2 resolution = v_TexRect.zw - v_TexRect.xy;
     highp vec2 pixelPos = (v_TexCoord - v_TexRect.xy) / resolution; // from 0 to 1
-    vec2 pixelPosReal = vec2(PathBuffer.Data[0].Bounds.x + (PathBuffer.Data[0].Bounds.z - PathBuffer.Data[0].Bounds.x) * pixelPos.x, PathBuffer.Data[0].Bounds.y + (PathBuffer.Data[0].Bounds.w - PathBuffer.Data[0].Bounds.y) * pixelPos.y);
-    float d = dst(pixelPosReal);
+    highp vec2 pixelPosReal = vec2(VertexBounds.x + (VertexBounds.z - VertexBounds.x) * pixelPos.x, VertexBounds.y + (VertexBounds.w - VertexBounds.y) * pixelPos.y);
+    highp float d = dst(pixelPosReal);
 
-    o_Colour = vec4(d < PathRadius ? 1.0 : 0.0); // 1.0 - clamp(d, 0.0, PathRadius) / PathRadius);
+    if (d > PathRadius)
+    {
+        o_Colour = vec4(0.0);
+        return;
+    }
+
+    highp float p = d / PathRadius;
+
+    o_Colour = texture(sampler2D(m_Texture, m_Sampler), v_TexRect.xy + vec2(1.0 - p, 0) * resolution, -0.9); // 1.0 - clamp(d, 0.0, PathRadius) / PathRadius);
 }
 
 #endif // SSBO_TEST_FS
