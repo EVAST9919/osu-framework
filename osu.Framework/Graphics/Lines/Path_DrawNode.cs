@@ -93,6 +93,7 @@ namespace osu.Framework.Graphics.Lines
 
                 if (pathBuffer == null || remapBuffer)
                 {
+                    pathBuffer?.Dispose();
                     pathBuffer = renderer.CreateShaderStorageBufferObject<PathNodeData>(64, Source.BBH.Nodes.Length);
 
                     for (int i = 0; i < Source.BBH.Nodes.Length; i++)
@@ -496,6 +497,8 @@ namespace osu.Framework.Graphics.Lines
                 base.Dispose(isDisposing);
 
                 triangleBatch?.Dispose();
+                pathData?.Dispose();
+                pathBuffer?.Dispose();
             }
 
             private enum SegmentStartLocation
