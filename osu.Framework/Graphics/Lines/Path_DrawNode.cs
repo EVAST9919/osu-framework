@@ -37,6 +37,8 @@ namespace osu.Framework.Graphics.Lines
 
             private IVertexBatch<TexturedVertex3D>? triangleBatch;
             private IShaderStorageBufferObject<PathNodeData>? pathBuffer;
+            private IUniformBuffer<PathData> pathData;
+
             private bool remapBuffer = true;
 
             public PathDrawNode(Path source)
@@ -120,6 +122,14 @@ namespace osu.Framework.Graphics.Lines
                 pathShader.Bind();
                 pathShader.BindUniformBlock("g_PathBuffer", pathBuffer);
 
+                pathData ??= renderer.CreateUniformBuffer<PathData>();
+                pathData.Data = new PathData
+                {
+                    PathRadius = radius
+                };
+
+                pathShader.BindUniformBlock("m_PathData", pathData);
+
                 renderer.DrawQuad(texture, (Quad)(Source.BBH.Nodes?[0].Bounds ?? new RectangleF(0, 0, 0, 0)), DrawColourInfo.Colour);
 
                 //updateVertexBuffer();
@@ -144,10 +154,17 @@ namespace osu.Framework.Graphics.Lines
                 public UniformInt Left;
                 public UniformInt Right;
                 public UniformBool IsLeaf;
-                public UniformPadding4 Pad1;
+                private UniformPadding4 pad;
                 public UniformVector2 SegmentStart;
                 public UniformVector2 SegmentEnd;
                 public UniformVector4 Bounds;
+            }
+
+            [StructLayout(LayoutKind.Sequential, Pack = 1)]
+            private record struct PathData
+            {
+                public UniformFloat PathRadius;
+                private UniformPadding12 pad;
             }
 
             private void addSegmentQuads(SegmentWithThickness segment, RectangleF texRect)
