@@ -85,12 +85,6 @@ namespace osu.Framework.Graphics.Lines
                 // grouping of vertices into primitives.
                 triangleBatch ??= renderer.CreateLinearBatch<TexturedVertex3D>(max_res * 200 * 3, 10, PrimitiveTopology.Triangles);
 
-                renderer.PushLocalMatrix(DrawInfo.Matrix);
-                renderer.PushDepthInfo(DepthInfo.Default);
-
-                // Blending is removed to allow for correct blending between the wedges of the path.
-                renderer.SetBlend(BlendingParameters.None);
-
                 if (pathBuffer == null || remapBuffer)
                 {
                     pathBuffer?.Dispose();
@@ -134,14 +128,13 @@ namespace osu.Framework.Graphics.Lines
 
                 Quad drawQuad = new Quad(0, 0, Source.BBH.VertexBounds.Width, Source.BBH.VertexBounds.Height);
 
+                renderer.PushLocalMatrix(DrawInfo.Matrix);
                 renderer.DrawQuad(texture, drawQuad, DrawColourInfo.Colour);
+                renderer.PopLocalMatrix();
 
                 //updateVertexBuffer();
 
                 pathShader.Unbind();
-
-                renderer.PopDepthInfo();
-                renderer.PopLocalMatrix();
             }
 
             private Vector2 pointOnCircle(float angle) => new Vector2(MathF.Cos(angle), MathF.Sin(angle));
@@ -151,6 +144,8 @@ namespace osu.Framework.Graphics.Lines
             private Color4 colourAt(Vector2 localPos) => DrawColourInfo.Colour.TryExtractSingleColour(out SRGBColour colour)
                 ? colour.SRGB
                 : DrawColourInfo.Colour.Interpolate(relativePosition(localPos)).SRGB;
+
+            protected internal override bool CanDrawOpaqueInterior => false;
 
             [StructLayout(LayoutKind.Sequential, Pack = 1)]
             private record struct PathNodeData

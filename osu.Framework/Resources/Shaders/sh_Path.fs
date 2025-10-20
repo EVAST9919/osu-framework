@@ -18,21 +18,21 @@ struct PathNodeData
 
 #ifndef OSU_GRAPHICS_NO_SSBO
 
-layout(std140, set = 0, binding = 0) readonly buffer g_PathBuffer
+layout(std140, set = 2, binding = 0) readonly buffer g_PathBuffer
 {
     PathNodeData Data[];
 } PathBuffer;
 
 #else // OSU_GRAPHICS_NO_SSBO
 
-layout(std140, set = 0, binding = 0) uniform g_PathBuffer
+layout(std140, set = 2, binding = 0) uniform g_PathBuffer
 {
     PathNodeData Data[64];
 } PathBuffer;
 
 #endif // OSU_GRAPHICS_NO_SSBO
 
-layout(std140, set = 2, binding = 0) uniform m_PathData
+layout(std140, set = 0, binding = 0) uniform m_PathData
 {
     float PathRadius;
     vec4 VertexBounds;
@@ -112,7 +112,7 @@ void main(void)
 
     highp float p = d / PathRadius;
 
-    o_Colour = texture(sampler2D(m_Texture, m_Sampler), v_TexRect.xy + vec2(1.0 - p, 0) * resolution, -0.9); // 1.0 - clamp(d, 0.0, PathRadius) / PathRadius);
+    o_Colour = getRoundedColor(texture(sampler2D(m_Texture, m_Sampler), v_TexRect.xy + vec2(1.0 - p, 0) * resolution, -0.9), v_TexCoord); // 1.0 - clamp(d, 0.0, PathRadius) / PathRadius);
 }
 
 #endif // SSBO_TEST_FS
