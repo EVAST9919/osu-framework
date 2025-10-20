@@ -40,6 +40,7 @@ namespace osu.Framework.Graphics.Lines
             private IUniformBuffer<PathData> pathData;
 
             private bool remapBuffer = true;
+            private int bufferSize = 1;
 
             public PathDrawNode(Path source)
                 : base(source)
@@ -61,6 +62,7 @@ namespace osu.Framework.Graphics.Lines
                     segments.Clear();
                     segments.AddRange(bbh.Segments);
                     remapBuffer = true;
+                    bufferSize = bbh.BufferSize;
 
                     treeVersion = newTreeVersion;
                 }
@@ -88,9 +90,9 @@ namespace osu.Framework.Graphics.Lines
                 if (pathBuffer == null || remapBuffer)
                 {
                     pathBuffer?.Dispose();
-                    pathBuffer = renderer.CreateShaderStorageBufferObject<PathNodeData>(64, Source.BBH.Nodes.Length);
+                    pathBuffer = renderer.CreateShaderStorageBufferObject<PathNodeData>(64, bufferSize);
 
-                    for (int i = 0; i < Source.BBH.Nodes.Length; i++)
+                    for (int i = 0; i < bufferSize; i++)
                     {
                         var n = Source.BBH.Nodes[i];
                         pathBuffer[i] = new PathNodeData

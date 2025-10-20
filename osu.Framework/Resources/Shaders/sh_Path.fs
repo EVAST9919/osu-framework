@@ -79,18 +79,20 @@ highp float dst(vec2 pixelPos)
         if (!contains(pixelPos, index))
             continue;
 
-        if (PathBuffer.Data[index].IsLeaf)
+        PathNodeData node = PathBuffer.Data[index];
+
+        if (node.IsLeaf)
         {
-            m = min(m, dstToLine(PathBuffer.Data[index].SegmentStart, PathBuffer.Data[index].SegmentEnd, pixelPos));
+            m = min(m, dstToLine(node.SegmentStart, node.SegmentEnd, pixelPos));
             continue;
         }
         else
         {
             stackPointer++;
-            stack[stackPointer] = PathBuffer.Data[index].Left;
+            stack[stackPointer] = node.Left;
 
             stackPointer++;
-            stack[stackPointer] = PathBuffer.Data[index].Right;
+            stack[stackPointer] = node.Right;
         }
     }
 

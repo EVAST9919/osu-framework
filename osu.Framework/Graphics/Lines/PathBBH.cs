@@ -43,7 +43,7 @@ namespace osu.Framework.Graphics.Lines
 
         public int TreeVersion { get; private set; }
 
-        public int BufferSize => lastLeafIndex;
+        public int BufferSize => lastLeafIndex + 1;
 
         private float radius;
         private BBHNode[]? nodes;
