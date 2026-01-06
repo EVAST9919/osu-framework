@@ -29,6 +29,10 @@ namespace osu.Framework.Graphics.Lines
             private IShader? pathShader;
             private Vector2 pathOffset;
             private int treeVersion;
+            private int rangeStart;
+            private int rangeEnd;
+            private Line firstSegment;
+            private Line lastSegment;
 
             private IVertexBatch<PathVertex>? quadBatch;
 
@@ -55,6 +59,14 @@ namespace osu.Framework.Graphics.Lines
                     treeVersion = newTreeVersion;
                 }
 
+                if (segments.Count > 0)
+                {
+                    firstSegment = bbh.FirstSegment;
+                    lastSegment = bbh.LastSegment;
+                }
+
+                rangeStart = bbh.RangeStart;
+                rangeEnd = bbh.RangeEnd;
                 pathOffset = bbh.VertexBounds.TopLeft;
 
                 radius = Source.PathRadius;
@@ -183,20 +195,22 @@ namespace osu.Framework.Graphics.Lines
             {
                 Debug.Assert(segments.Count > 0);
 
-                Line segmentToDraw = segments[0];
+                Line segmentToDraw = firstSegment;
 
                 SegmentStartLocation location = SegmentStartLocation.Outside;
                 SegmentStartLocation nextLocation = SegmentStartLocation.End;
 
                 // We initialize "fake" initial segment before the 0'th one
                 // so that on first drawSegment() call with current SegmentStartLocation parameters path start cap will be drawn.
-                DrawableSegment lastDrawnSegment = new DrawableSegment(segments[0], radius);
+                DrawableSegment lastDrawnSegment = new DrawableSegment(firstSegment, radius);
 
-                for (int i = 1; i < segments.Count; i++)
+                for (int i = rangeStart + 1; i <= rangeEnd; i++)
                 {
+                    Line currentSegment = i == rangeEnd ? lastSegment : segments[i];
+
                     Vector2 dir = segmentToDraw.Direction;
                     float lengthSquared = dir.X * dir.X + dir.Y * dir.Y;
-                    Vector2 nextVertex = segments[i].EndPoint;
+                    Vector2 nextVertex = currentSegment.EndPoint;
 
                     // If segment is too short, make its end point equal start point of a new segment
                     if (lengthSquared < precision)
@@ -234,7 +248,7 @@ namespace osu.Framework.Graphics.Lines
                         drawSegment(ref s, ref lastDrawnSegment, location, nextLocation == SegmentStartLocation.StartOrMiddle);
 
                         lastDrawnSegment = s;
-                        segmentToDraw = segments[i];
+                        segmentToDraw = currentSegment;
                         location = nextLocation;
                         nextLocation = SegmentStartLocation.End;
                     }
