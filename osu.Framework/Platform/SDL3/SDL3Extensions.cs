@@ -869,7 +869,7 @@ namespace osu.Framework.Platform.SDL3
             if (windowFlags.HasFlagFast(SDL_WindowFlags.SDL_WINDOW_BORDERLESS))
                 return WindowState.FullscreenBorderless;
 
-            if (windowFlags.HasFlagFast(SDL_WindowFlags.SDL_WINDOW_MINIMIZED))
+            if (windowFlags.HasFlagFast(SDL_WindowFlags.SDL_WINDOW_MINIMIZED) || windowFlags.HasFlagFast(SDL_WindowFlags.SDL_WINDOW_HIDDEN))
                 return WindowState.Minimised;
 
             if (windowFlags.HasFlagFast(SDL_WindowFlags.SDL_WINDOW_FULLSCREEN))
