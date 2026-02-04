@@ -87,9 +87,7 @@ namespace osu.Framework.Platform.Windows
         }
 
         protected override IWindow CreateWindow(GraphicsSurfaceType preferredSurface)
-            => FrameworkEnvironment.UseSDL3
-                ? new SDL3WindowsWindow(preferredSurface, Options.FriendlyGameName)
-                : new SDL2WindowsWindow(preferredSurface, Options.FriendlyGameName);
+            => new SDL3WindowsWindow(preferredSurface, Options.FriendlyGameName);
 
         public override IEnumerable<KeyBinding> PlatformKeyBindings => base.PlatformKeyBindings.Concat(new[]
         {
