@@ -169,6 +169,10 @@ namespace osu.Framework.Platform.SDL3
             }
         }
 
+        // On Wayland, the window position is always reported as the top-left corner of the current display,
+        // making it inaccurate in windowed mode.
+        public bool PositionAccurate => !(IsWayland && WindowMode.Value == Configuration.WindowMode.Windowed);
+
         private bool resizable = true;
 
         /// <summary>
@@ -682,7 +686,7 @@ namespace osu.Framework.Platform.SDL3
                 }
             }
 
-            index = default;
+            index = 0;
             return false;
         }
 
@@ -770,7 +774,7 @@ namespace osu.Framework.Platform.SDL3
                 return true;
             }
 
-            maximized = default;
+            maximized = false;
             return false;
         }
 
