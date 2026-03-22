@@ -11,7 +11,7 @@ using osu.Framework.Platform.Windows.Native;
 
 namespace osu.Framework.Platform
 {
-    internal class IconGroup
+    public class IconGroup
     {
         [StructLayout(LayoutKind.Sequential)]
         internal struct IconDirEntry

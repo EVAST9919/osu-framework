@@ -8,7 +8,7 @@ using System.Runtime.Versioning;
 namespace osu.Framework.Platform.Windows.Native
 {
     [SupportedOSPlatform("windows")]
-    internal class Icon : IDisposable
+    public class Icon : IDisposable
     {
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool DestroyIcon(IntPtr hIcon);

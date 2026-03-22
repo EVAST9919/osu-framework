@@ -2,7 +2,9 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using osu.Framework.Allocation;
+using osu.Framework.Extensions.ImageExtensions;
 using SDL;
+using SixLabors.ImageSharp.PixelFormats;
 using static SDL.SDL3;
 
 namespace osu.Framework.Platform.SDL3
@@ -12,7 +14,7 @@ namespace osu.Framework.Platform.SDL3
         private SDL_Tray* innerTray;
         private SDL_TrayMenu* rootMenu;
 
-        private TrayIcon trayIcon;
+        private readonly TrayIcon trayIcon;
 
         internal SDL3TrayIcon(TrayIcon tray)
         {
@@ -28,6 +30,25 @@ namespace osu.Framework.Platform.SDL3
 
             rootMenu = SDL_CreateTrayMenu(innerTray);
             insertMenu(rootMenu, trayIcon.Menu);
+
+            if (trayIcon.Icon == null)
+                return;
+
+            var pixelMemory = trayIcon.Icon.CreateReadOnlyPixelMemory();
+            var imageSize = trayIcon.Icon.Size;
+            var pixelSpan = pixelMemory.Span;
+
+            fixed (Rgba32* ptr = pixelSpan)
+            {
+                var pixelFormat = SDL_GetPixelFormatForMasks(32, 0xff, 0xff00, 0xff0000, 0xff000000);
+                var surface = SDL3Extensions.LogErrorIfFailed(SDL_CreateSurfaceFrom(imageSize.Width, imageSize.Height, pixelFormat, new IntPtr(ptr), imageSize.Width * 4));
+
+                if (surface == null)
+                    return;
+
+                SDL_SetTrayIcon(innerTray, surface);
+                SDL_DestroySurface(surface);
+            }
         }
 
         private void insertMenu(SDL_TrayMenu* menu, TrayMenuEntry[] entries)
@@ -35,54 +56,64 @@ namespace osu.Framework.Platform.SDL3
             for (int i = 0; i < entries.Length; i++)
             {
                 var entry = entries[i];
-                if (entry is TrayButton button)
+
+                switch (entry)
                 {
-                    SDL_TrayEntryFlags flags = SDL_TrayEntryFlags.SDL_TRAYENTRY_BUTTON;
-
-                    if (!button.Enabled)
-                        flags |= SDL_TrayEntryFlags.SDL_TRAYENTRY_DISABLED;
-
-                    SDL_TrayEntry* nativeEntry = SDL_InsertTrayEntryAt(menu, -1, button.Label, flags);
-
-                    if (button.Action is not null)
+                    case TrayButton button:
                     {
-                        SetCallback(nativeEntry, button.Action);
+                        SDL_TrayEntryFlags flags = SDL_TrayEntryFlags.SDL_TRAYENTRY_BUTTON;
+
+                        if (!button.Enabled)
+                            flags |= SDL_TrayEntryFlags.SDL_TRAYENTRY_DISABLED;
+
+                        SDL_TrayEntry* nativeEntry = SDL_InsertTrayEntryAt(menu, -1, button.Label, flags);
+
+                        if (button.Action is not null)
+                        {
+                            SetCallback(nativeEntry, button.Action);
+                        }
+
+                        break;
                     }
-                }
-                else if (entry is TrayCheckBox checkbox)
-                {
-                    SDL_TrayEntryFlags flags = SDL_TrayEntryFlags.SDL_TRAYENTRY_CHECKBOX;
 
-                    if (!checkbox.Enabled)
-                        flags |= SDL_TrayEntryFlags.SDL_TRAYENTRY_DISABLED;
-
-                    if (checkbox.Checked)
-                        flags |= SDL_TrayEntryFlags.SDL_TRAYENTRY_CHECKED;
-
-                    SDL_TrayEntry* nativeEntry = SDL_InsertTrayEntryAt(menu, -1, checkbox.Label, flags);
-
-                    if (checkbox.Action is not null)
+                    case TrayCheckBox checkbox:
                     {
-                        SetCallback(nativeEntry, checkbox.Action);
+                        SDL_TrayEntryFlags flags = SDL_TrayEntryFlags.SDL_TRAYENTRY_CHECKBOX;
+
+                        if (!checkbox.Enabled)
+                            flags |= SDL_TrayEntryFlags.SDL_TRAYENTRY_DISABLED;
+
+                        if (checkbox.Checked)
+                            flags |= SDL_TrayEntryFlags.SDL_TRAYENTRY_CHECKED;
+
+                        SDL_TrayEntry* nativeEntry = SDL_InsertTrayEntryAt(menu, -1, checkbox.Label, flags);
+
+                        if (checkbox.Action is not null)
+                        {
+                            SetCallback(nativeEntry, checkbox.Action);
+                        }
+
+                        break;
                     }
-                }
-                else if (entry is TraySeparator)
-                {
-                    // a button/checkmark with a null label is a tray separator
-                    SDL_InsertTrayEntryAt(menu, -1, (Utf8String)null, SDL_TrayEntryFlags.SDL_TRAYENTRY_BUTTON);
-                }
-                else if (entry is TraySubMenu submenu)
-                {
-                    SDL_TrayEntryFlags flags = SDL_TrayEntryFlags.SDL_TRAYENTRY_SUBMENU;
 
-                    if (!submenu.Enabled)
-                        flags |= SDL_TrayEntryFlags.SDL_TRAYENTRY_DISABLED;
+                    case TraySeparator:
+                        // a button/checkmark with a null label is a tray separator
+                        SDL_InsertTrayEntryAt(menu, -1, (Utf8String)null, SDL_TrayEntryFlags.SDL_TRAYENTRY_BUTTON);
+                        break;
 
-                    SDL_TrayMenu* smenu = (SDL_TrayMenu*)SDL_InsertTrayEntryAt(menu, -1, submenu.Label, flags);
-
-                    if (submenu.Menu is not null)
+                    case TraySubMenu submenu:
                     {
-                        insertMenu(smenu, submenu.Menu);
+                        SDL_TrayEntryFlags flags = SDL_TrayEntryFlags.SDL_TRAYENTRY_SUBMENU;
+
+                        if (!submenu.Enabled)
+                            flags |= SDL_TrayEntryFlags.SDL_TRAYENTRY_DISABLED;
+
+                        SDL_TrayMenu* sMenu = (SDL_TrayMenu*)SDL_InsertTrayEntryAt(menu, -1, submenu.Label, flags);
+
+                        if (submenu.Menu is not null)
+                            insertMenu(sMenu, submenu.Menu);
+
+                        break;
                     }
                 }
             }
