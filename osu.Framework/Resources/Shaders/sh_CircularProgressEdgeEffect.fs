@@ -156,20 +156,18 @@ lowp float progresGlow(highp vec2 pixelPos, mediump float progress, mediump floa
 
         if (pixelPos.x < 0.5 && isLeft(rotatingEdgeBottom, rotatingEdgeTop, pixelPos))
         {
-            return (glowRotating + glowIdle);
+            return glowIdle + (1.0 - glowIdle) * glowRotating;
             //float blobsDst = smin(dstToIdle, dstToRotating, min(distance(arcStart, arcEnd) * 0.2, min(glowSize.x, glowSize.y) * 0.2));
             //return getGlow(blobsDst, min(glowSize.x, glowSize.y));
         }
 
-        return max(glowIdle, glowRotating);
+        return glowIdle + (1.0 - glowIdle) * glowRotating;
     }
 
-    return 0.0;
+    highp float dstToIdleEdge = getGlow(dstToLine(vec2(0.5, texelSize), vec2(0.5, 2.0 * pathRadius), pixelPos), min(glowSize.x, glowSize.y));
+    highp float dstToRotatingEdge = getGlow(dstToLine(rotatingEdgeTop, rotatingEdgeBottom, pixelPos), min(glowSize.x, glowSize.y));
 
-    highp float dstToIdleEdge = dstToLine(vec2(0.5, texelSize), vec2(0.5, 2.0 * pathRadius), pixelPos);
-    highp float dstToRotatingEdge = dstToLine(rotatingEdgeTop, rotatingEdgeBottom, pixelPos);
-
-    return min(dstToIdleEdge, dstToRotatingEdge);
+    return dstToIdleEdge + (1.0 - dstToIdleEdge) * dstToRotatingEdge;
 }
 
 void main(void)
@@ -179,9 +177,9 @@ void main(void)
     // Inflate coordinate space, so it would be (-glowSize -> 0 -> 1 -> glowSize) to preserve everything in place while inflating the draw quad
     highp vec2 pixelPos = (v_TexCoord / resolution) * (vec2(1.0) + glowSize * 2.0) - glowSize;
 
-    highp float dst = dstToRoundedProgress(pixelPos, progress, innerRadius, roundedCaps, texelSize);
-    lowp float glowA = hollow && dst < 0.0 ? smoothstep(texelSize, 0.0, -dst) : getGlow(dst, min(glowSize.x, glowSize.y));
-    //lowp float glowA = smoothstep(texelSize, 0.0, dst);
+    //highp float dst = dstToRoundedProgress(pixelPos, progress, innerRadius, roundedCaps, texelSize);
+    //lowp float glowA = hollow && dst < 0.0 ? smoothstep(texelSize, 0.0, -dst) : getGlow(dst, min(glowSize.x, glowSize.y));
+    lowp float glowA = progresGlow(pixelPos, progress, innerRadius, roundedCaps, texelSize);
     o_Colour = getRoundedColor(vec4(vec3(1.0), glowA), v_TexCoord);
 }
 
