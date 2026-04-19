@@ -15,6 +15,17 @@ namespace osu.Framework.Graphics.Lines
     /// </summary>
     public class PathBBH : IDisposable
     {
+        /// <summary>
+        /// Determines whether the bounding calculation should include
+        /// <see cref="RectangleF.Empty"/>, which implicitly adds a (0,0) point.
+        /// </summary>
+        private bool includeZeroPoint { get; }
+
+        public PathBBH(bool includeZeroPoint = true)
+        {
+            this.includeZeroPoint = includeZeroPoint;
+        }
+
         public IEnumerable<Line> Segments
         {
             get
@@ -87,13 +98,17 @@ namespace osu.Framework.Graphics.Lines
                     break;
 
                 case 1:
-                    VertexBounds = RectangleF.Union(new RectangleF(vertices[0] - new Vector2(radius), new Vector2(radius * 2)), RectangleF.Empty);
+                {
+                    var bounds = new RectangleF(vertices[0] - new Vector2(radius), new Vector2(radius * 2));
+                    VertexBounds = includeZeroPoint ? RectangleF.Union(bounds, RectangleF.Empty) : bounds;
                     break;
+                }
 
                 default:
                 {
                     computeNodes(vertices);
-                    VertexBounds = RectangleF.Union(nodes[0].Bounds, RectangleF.Empty);
+                    var bounds = nodes[0].Bounds;
+                    VertexBounds = includeZeroPoint ? RectangleF.Union(bounds, RectangleF.Empty) : bounds;
                     break;
                 }
             }

@@ -22,6 +22,12 @@ namespace osu.Framework.Graphics.Lines
 {
     public partial class Path : Drawable, IBufferedDrawable
     {
+        /// <summary>
+        /// Determines whether the bounding calculation should include
+        /// <see cref="RectangleF.Empty"/>, which implicitly adds a (0,0) point.
+        /// </summary>
+        protected virtual bool IncludeZeroPoint => true;
+
         public IShader TextureShader { get; private set; }
         private IShader pathShader;
 
@@ -31,6 +37,7 @@ namespace osu.Framework.Graphics.Lines
         public Path()
         {
             AutoSizeAxes = Axes.Both;
+            bbhBacking = new PathBBH(IncludeZeroPoint);
         }
 
         [BackgroundDependencyLoader]
@@ -204,7 +211,7 @@ namespace osu.Framework.Graphics.Lines
             Invalidate(Invalidation.DrawSize);
         }
 
-        private readonly PathBBH bbhBacking = new PathBBH();
+        private readonly PathBBH bbhBacking;
         private readonly Cached bbhCache = new Cached();
 
         protected PathBBH BBH => bbhCache.IsValid ? bbhBacking : computeBBH();
