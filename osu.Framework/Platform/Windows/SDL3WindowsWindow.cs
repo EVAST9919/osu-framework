@@ -54,6 +54,14 @@ namespace osu.Framework.Platform.Windows
         {
             base.Create();
 
+            /*uint backdropType = (uint)DWM_SYSTEMBACKDROP_TYPE.DWMSBT_TRANSIENTWINDOW; // For Acrylic blur
+            DwmSetWindowAttribute(WindowHandle, DWMWINDOWATTRIBUTE.DWMWA_SYSTEMBACKDROP_TYPE, ref backdropType, sizeof(uint));*/
+            /*uint t = 0x00000001;
+            DwmSetWindowAttribute(WindowHandle, DWMWINDOWATTRIBUTE.DWMWA_USE_IMMERSIVE_DARK_MODE, ref t, sizeof(uint));*/
+            /*uint t2 = 0xFFFFFFFE;
+            DwmSetWindowAttribute(WindowHandle, DWMWINDOWATTRIBUTE.DWMWA_BORDER_COLOR, ref t2, sizeof(uint));*/
+            //SetWindowDisplayAffinity(WindowHandle, 0x00000011);
+
             // disable all pen and touch feedback as this causes issues when running "optimised" fullscreen under Direct3D11.
             foreach (var feedbackType in Enum.GetValues<FeedbackType>())
                 Native.Input.SetWindowFeedbackSetting(WindowHandle, feedbackType, false);
@@ -178,5 +186,51 @@ namespace osu.Framework.Platform.Windows
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern uint SetWindowDisplayAffinity(IntPtr hwnd, uint dwAffinity);
+
+        public enum DWMWINDOWATTRIBUTE : uint
+        {
+            DWMWA_NCRENDERING_ENABLED,
+            DWMWA_NCRENDERING_POLICY,
+            DWMWA_TRANSITIONS_FORCEDISABLED,
+            DWMWA_ALLOW_NCPAINT,
+            DWMWA_CAPTION_BUTTON_BOUNDS,
+            DWMWA_NONCLIENT_RTL_LAYOUT,
+            DWMWA_FORCE_ICONIC_REPRESENTATION,
+            DWMWA_FLIP3D_POLICY,
+            DWMWA_EXTENDED_FRAME_BOUNDS,
+            DWMWA_HAS_ICONIC_BITMAP,
+            DWMWA_DISALLOW_PEEK,
+            DWMWA_EXCLUDED_FROM_PEEK,
+            DWMWA_CLOAK,
+            DWMWA_CLOAKED,
+            DWMWA_FREEZE_REPRESENTATION,
+            DWMWA_PASSIVE_UPDATE_MODE,
+            DWMWA_USE_HOSTBACKDROPBRUSH,
+            DWMWA_USE_IMMERSIVE_DARK_MODE = 20,
+            DWMWA_WINDOW_CORNER_PREFERENCE = 33,
+            DWMWA_BORDER_COLOR,
+            DWMWA_CAPTION_COLOR,
+            DWMWA_TEXT_COLOR,
+            DWMWA_VISIBLE_FRAME_BORDER_THICKNESS,
+            DWMWA_SYSTEMBACKDROP_TYPE,
+            DWMWA_REDIRECTIONBITMAP_ALPHA,
+            DWMWA_BORDER_MARGINS,
+            DWMWA_LAST
+        }
+
+        public enum DWM_SYSTEMBACKDROP_TYPE : uint
+        {
+            DWMSBT_AUTO,
+            DWMSBT_NONE,
+            DWMSBT_MAINWINDOW,
+            DWMSBT_TRANSIENTWINDOW,
+            DWMSBT_TABBEDWINDOW
+        }
+
+        [DllImport("Dwmapi.dll")]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, DWMWINDOWATTRIBUTE dwAttribute, ref uint pvAttribute, uint cbAttribute);
     }
 }
