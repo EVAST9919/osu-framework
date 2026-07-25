@@ -117,16 +117,24 @@ namespace osu.Framework.Graphics.Transforms
 
         protected void ComputeSingleValue(float dt, ref float current, ref float velocity, float target, float targetVelocity)
         {
-            float k2Stable = MathF.Max(MathF.Max(k2, dt * dt / 2 + dt * k1 / 2), dt * k1);
+            float k2Stable = MathF.Max(MathF.Max(k2, (dt * dt) / 2 + (dt * k1) / 2), dt * k1);
 
             current += dt * velocity;
-            velocity += (dt * (target + k3 * targetVelocity - current - k1 * velocity)) / k2Stable;
+            velocity += (dt * (target + (k3 * targetVelocity) - current - (k1 * velocity))) / k2Stable;
+        }
+
+        protected void ComputeSingleValue(float dt, ref double current, ref double velocity, double target, double targetVelocity)
+        {
+            float k2Stable = MathF.Max(MathF.Max(k2, (dt * dt) / 2 + (dt * k1) / 2), dt * k1);
+
+            current += dt * velocity;
+            velocity += (dt * (target + (k3 * targetVelocity) - current - (k1 * velocity))) / k2Stable;
         }
     }
 
     public class FloatSpring : Spring<float>
     {
-        protected override float GetTargetVelocity(float target, float previousTarget, float dt) => (target - previousTarget) / dt;
+        protected override float GetTargetVelocity(float target, float previousTarget, float dt) => dt == 0f ? 0f : (target - previousTarget) / dt;
 
         protected override float ComputeNextValue(float dt, float target, float targetVelocity)
         {
@@ -136,9 +144,21 @@ namespace osu.Framework.Graphics.Transforms
         }
     }
 
+    public class DoubleSpring : Spring<double>
+    {
+        protected override double GetTargetVelocity(double target, double previousTarget, float dt) => dt == 0f ? 0d : (target - previousTarget) / dt;
+
+        protected override double ComputeNextValue(float dt, double target, double targetVelocity)
+        {
+            ComputeSingleValue(dt, ref Current, ref Velocity, target, targetVelocity);
+
+            return Current;
+        }
+    }
+
     public class Vector2Spring : Spring<Vector2>
     {
-        protected override Vector2 GetTargetVelocity(Vector2 target, Vector2 previousTarget, float dt) => (target - previousTarget) / dt;
+        protected override Vector2 GetTargetVelocity(Vector2 target, Vector2 previousTarget, float dt) => dt == 0f ? Vector2.Zero : (target - previousTarget) / dt;
 
         protected override Vector2 ComputeNextValue(float dt, Vector2 target, Vector2 targetVelocity)
         {

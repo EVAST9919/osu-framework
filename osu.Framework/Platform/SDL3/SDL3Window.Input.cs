@@ -97,6 +97,8 @@ namespace osu.Framework.Platform.SDL3
 
         private readonly Dictionary<SDL_JoystickID, SDL3ControllerBindings> controllers = new Dictionary<SDL_JoystickID, SDL3ControllerBindings>();
 
+        private readonly Dictionary<SDL_PenID, TabletPenDeviceType> penDeviceTypes = new Dictionary<SDL_PenID, TabletPenDeviceType>();
+
         private void updateCursorVisibility(bool cursorVisible) =>
             ScheduleCommand(() =>
             {
@@ -322,8 +324,7 @@ namespace osu.Framework.Platform.SDL3
                     break;
 
                 case SDL_EventType.SDL_EVENT_GAMEPAD_REMOVED:
-                    SDL_CloseGamepad(controllers[evtCdevice.which].GamepadHandle);
-                    controllers.Remove(evtCdevice.which);
+                    removeJoystick(evtCdevice.which);
                     break;
 
                 case SDL_EventType.SDL_EVENT_GAMEPAD_REMAPPED:
@@ -368,6 +369,18 @@ namespace osu.Framework.Platform.SDL3
             controllers[instanceID] = new SDL3ControllerBindings(joystick, controller);
         }
 
+        private void removeJoystick(SDL_JoystickID instanceID)
+        {
+            if (controllers.Remove(instanceID, out var controller))
+            {
+                if (controller.GamepadHandle != null)
+                    SDL_CloseGamepad(controller.GamepadHandle);
+
+                if (controller.JoystickHandle != null)
+                    SDL_CloseJoystick(controller.JoystickHandle);
+            }
+        }
+
         /// <summary>
         /// Populates <see cref="controllers"/> with joysticks that are already connected.
         /// </summary>
@@ -393,12 +406,7 @@ namespace osu.Framework.Platform.SDL3
                     break;
 
                 case SDL_EventType.SDL_EVENT_JOYSTICK_REMOVED:
-                    // if the joystick is already closed, ignore it
-                    if (!controllers.ContainsKey(evtJdevice.which))
-                        break;
-
-                    SDL_CloseJoystick(controllers[evtJdevice.which].JoystickHandle);
-                    controllers.Remove(evtJdevice.which);
+                    removeJoystick(evtJdevice.which);
                     break;
             }
         }
@@ -531,16 +539,67 @@ namespace osu.Framework.Platform.SDL3
 
         private void handleKeymapChangedEvent() => KeymapChanged?.Invoke();
 
-        private static TabletPenDeviceType getPenType(SDL_PenID instanceID) => SDL_GetPenDeviceType(instanceID).ThrowIfFailed().ToTabletPenDeviceType();
+        private readonly bool penProximityWorkaround = RuntimeInfo.OS == RuntimeInfo.Platform.Android;
+
+        private bool tryGetPenDeviceType(SDL_PenID penID, out TabletPenDeviceType deviceType)
+        {
+            if (penDeviceTypes.TryGetValue(penID, out deviceType))
+                return true;
+
+            // Workaround for Android: after clicking with a pen, it can send motion and touch events even though we've received SDL_EVENT_PEN_PROXIMITY_OUT.
+            // It's either a bug in Android or SDL.
+            // Instead of ignoring those events, fetch the type and store it.
+            if (penProximityWorkaround)
+            {
+                var sdlType = SDL_GetPenDeviceType(penID);
+
+                if (sdlType == SDL_PenDeviceType.SDL_PEN_DEVICE_TYPE_INVALID)
+                    return false;
+
+                deviceType = sdlType.ToTabletPenDeviceType();
+                penDeviceTypes[penID] = deviceType;
+                return true;
+            }
+
+            return false;
+        }
+
+        private void handlePenProximityEvent(SDL_PenProximityEvent evtPenProximity)
+        {
+            if (evtPenProximity.type == SDL_EventType.SDL_EVENT_PEN_PROXIMITY_IN)
+            {
+                if (!penProximityWorkaround && penDeviceTypes.ContainsKey(evtPenProximity.which))
+                    Logger.Log($"Unexpected SDL_EVENT_PEN_PROXIMITY_IN for pen id={evtPenProximity.which}. Pen already in proximity.", level: LogLevel.Important);
+
+                // On windows, the call to SDL_GetPenDeviceType() can infrequently error out with "Invalid pen instance ID".
+                // This doesn't make sense, as we got the pen ID from an event, so it should be valid.
+                // Hard-code to `Unknown` pen type to avoid the crash. Currently, on windows, all pens are already reported as Unknown.
+                // See https://github.com/ppy/osu-framework/issues/6747 for more information.
+                penDeviceTypes[evtPenProximity.which] = RuntimeInfo.OS == RuntimeInfo.Platform.Windows
+                    ? TabletPenDeviceType.Unknown
+                    : SDL_GetPenDeviceType(evtPenProximity.which).ThrowIfFailed().ToTabletPenDeviceType();
+            }
+            else
+            {
+                if (!penDeviceTypes.Remove(evtPenProximity.which))
+                    Logger.Log($"Unexpected SDL_EVENT_PEN_PROXIMITY_OUT for pen id={evtPenProximity.which}. Pen not in proximity.", level: LogLevel.Important);
+            }
+        }
 
         private void handlePenMotionEvent(SDL_PenMotionEvent evtPenMotion)
         {
-            PenMove?.Invoke(getPenType(evtPenMotion.which), new Vector2(evtPenMotion.x, evtPenMotion.y) * Scale, evtPenMotion.pen_state.HasFlagFast(SDL_PenInputFlags.SDL_PEN_INPUT_DOWN));
+            if (tryGetPenDeviceType(evtPenMotion.which, out var type))
+                PenMove?.Invoke(type, new Vector2(evtPenMotion.x, evtPenMotion.y) * Scale, evtPenMotion.pen_state.HasFlagFast(SDL_PenInputFlags.SDL_PEN_INPUT_DOWN));
+            else
+                Logger.Log($"Unexpected SDL_EVENT_PEN_MOTION for pen id={evtPenMotion.which}. Pen not in proximity.", level: LogLevel.Important);
         }
 
         private void handlePenTouchEvent(SDL_PenTouchEvent evtPenTouch)
         {
-            PenTouch?.Invoke(getPenType(evtPenTouch.which), evtPenTouch.down, new Vector2(evtPenTouch.x, evtPenTouch.y) * Scale);
+            if (tryGetPenDeviceType(evtPenTouch.which, out var type))
+                PenTouch?.Invoke(type, evtPenTouch.down, new Vector2(evtPenTouch.x, evtPenTouch.y) * Scale);
+            else
+                Logger.Log($"Unexpected {evtPenTouch.type} for pen id={evtPenTouch.which}. Pen not in proximity.", level: LogLevel.Important);
         }
 
         /// <summary>
