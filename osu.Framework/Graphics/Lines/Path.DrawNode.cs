@@ -9,8 +9,9 @@ using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Rendering.Vertices;
 using osu.Framework.Graphics.Shaders;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
-using osuTK.Graphics.ES30;
+using osu.Framework.Graphics.Textures;
+using osu.Framework.Utils;
+using osuTK.Graphics;
 
 namespace osu.Framework.Graphics.Lines
 {
@@ -25,10 +26,12 @@ namespace osu.Framework.Graphics.Lines
 
             private readonly List<Line> segments = new List<Line>();
 
+            private Texture? texture;
             private float radius;
             private IShader? pathShader;
+            private RectangleF texRect;
 
-            private IVertexBatch<PathVertex>? quadBatch;
+            private IVertexBatch<TexturedVertex3D>? triangleBatch;
 
             public PathDrawNode(Path source)
                 : base(source)
@@ -42,6 +45,8 @@ namespace osu.Framework.Graphics.Lines
                 segments.Clear();
                 segments.AddRange(Source.segments);
 
+                texture = Source.Texture;
+                texRect = texture.GetTextureRect(new RectangleF(0.5f, 0.5f, texture.Width - 1, texture.Height - 1));
                 radius = Source.PathRadius;
                 pathShader = Source.pathShader;
             }
@@ -50,32 +55,28 @@ namespace osu.Framework.Graphics.Lines
             {
                 base.Draw(renderer);
 
-                if (segments.Count == 0 || pathShader == null || radius == 0f)
+                if (texture?.Available != true || segments.Count == 0 || pathShader == null || radius == 0f)
                     return;
 
-                // Size must be divisible by 4 such that the amount of vertices is a multiple of the amount of vertices
+                // Size must be divisible by 3 such that the amount of vertices is a multiple of the amount of vertices
                 // per primitive (quads in this case). Otherwise overflowing the batch will result in wrong
                 // grouping of vertices into primitives.
-                quadBatch ??= renderer.CreateQuadBatch<PathVertex>(9000, 10);
+                triangleBatch ??= renderer.CreateLinearBatch<TexturedVertex3D>(9000, 10, PrimitiveTopology.Triangles);
 
                 renderer.PushLocalMatrix(DrawInfo.Matrix);
+                renderer.PushDepthInfo(DepthInfo.Default);
 
-                renderer.SetBlend(new BlendingParameters
-                {
-                    Source = BlendingType.One,
-                    Destination = BlendingType.One,
-                    SourceAlpha = BlendingType.One,
-                    DestinationAlpha = BlendingType.One,
-                    RGBEquation = BlendingEquation.Max,
-                    AlphaEquation = BlendingEquation.Max,
-                });
+                // Blending is removed to allow for correct blending between the wedges of the path.
+                renderer.SetBlend(BlendingParameters.None);
 
                 pathShader.Bind();
+                texture.Bind();
 
                 updateVertexBuffer();
 
                 pathShader.Unbind();
 
+                renderer.PopDepthInfo();
                 renderer.PopLocalMatrix();
             }
 
@@ -96,7 +97,6 @@ namespace osu.Framework.Graphics.Lines
                 Vector2 bottomLeft = segment.BottomLeft;
                 Vector2 bottomRight = segment.BottomRight;
                 Vector2 dir = segment.DirectionNormalized;
-                Vector2 offset = dir * radius;
 
                 // Segment starts at the end of the previous one
                 if (location == SegmentStartLocation.End)
@@ -106,17 +106,17 @@ namespace osu.Framework.Graphics.Lines
                     Vector2 dir2 = -prevSegment.DirectionNormalized;
 
                     Vector2.Dot(ref dir, ref dir2, out float dot);
+                    Vector2.PerpDot(ref dir, ref dir2, out float pDot);
 
-                    // Angle between segments is less than 90 degrees - don't draw anything and use segment start cap instead.
-                    // Overdraw is inevitable anyway and this seems like a cheaper option than computing exact shape.
-                    // Also by doing this we can further reduce vertex count.
+                    // angle between segments is less than 90 degrees
                     if (dot >= 0)
                     {
-                        startCap = true;
+                        float thetaDiff = MathF.Atan2(pDot, dot);
+                        Line toConnect = thetaDiff < 0f ? new Line(prevSegment.TopRight, topLeft) : new Line(prevSegment.BottomRight, bottomLeft);
+                        drawFan(segment.StartPoint, toConnect.StartPoint, toConnect.EndPoint, thetaDiff < 0f, (float)Math.PI - Math.Abs(thetaDiff));
                     }
                     else
                     {
-                        Vector2.PerpDot(ref dir, ref dir2, out float pDot);
                         float thetaDiff = Math.Abs(MathF.Atan(pDot / dot));
 
                         // at this small angle curvature isn't noticeable, we can get away with straight-up connecting segment to the previous one.
@@ -129,39 +129,82 @@ namespace osu.Framework.Graphics.Lines
                         }
                         else
                         {
-                            Vector2 origin = segment.StartPoint;
                             Line toConnect = pDot < 0f ? new Line(prevSegment.TopRight, topLeft) : new Line(prevSegment.BottomRight, bottomLeft);
-                            Vector2 outerVertex = toConnect.EndPoint - offset * (float)Math.Tan(thetaDiff * 0.5);
-                            // position of a vertex which is located slightly below segments intersection to cover potentially missing pixels due to segments not having shared vertices
-                            Vector2 innerVertex = Vector2.Lerp(outerVertex, origin, 1.1f);
-                            drawQuad(toConnect.StartPoint, outerVertex, innerVertex, toConnect.EndPoint, origin, origin);
+                            drawFan(segment.StartPoint, toConnect.StartPoint, toConnect.EndPoint, pDot < 0f, thetaDiff);
                         }
                     }
                 }
 
                 if (startCap)
-                {
-                    topLeft -= offset;
-                    bottomLeft -= offset;
-                }
+                    drawFan(segment.StartPoint, segment.TopLeft, segment.BottomLeft, false, MathF.PI);
 
                 if (endCap)
-                {
-                    topRight += offset;
-                    bottomRight += offset;
-                }
+                    drawFan(segment.EndPoint, segment.TopRight, segment.BottomRight, true, MathF.PI);
 
-                drawQuad(topLeft, topRight, bottomLeft, bottomRight, segment.StartPoint, segment.EndPoint);
+                createOuterVertex(topLeft);
+                createOuterVertex(topRight);
+                createInnerVertex(segment.StartPoint);
+
+                createInnerVertex(segment.StartPoint);
+                createOuterVertex(topRight);
+                createInnerVertex(segment.EndPoint);
+
+                createInnerVertex(segment.StartPoint);
+                createInnerVertex(segment.EndPoint);
+                createOuterVertex(bottomLeft);
+
+                createOuterVertex(bottomLeft);
+                createInnerVertex(segment.EndPoint);
+                createOuterVertex(bottomRight);
             }
 
-            private void drawQuad(Vector2 topLeft, Vector2 topRight, Vector2 bottomLeft, Vector2 bottomRight, Vector2 start, Vector2 end)
+            private void createOuterVertex(Vector2 position)
             {
-                Debug.Assert(quadBatch != null);
+                Debug.Assert(triangleBatch != null);
 
-                quadBatch.Add(new PathVertex(topLeft, start, end, radius));
-                quadBatch.Add(new PathVertex(topRight, start, end, radius));
-                quadBatch.Add(new PathVertex(bottomRight, start, end, radius));
-                quadBatch.Add(new PathVertex(bottomLeft, start, end, radius));
+                triangleBatch.Add(new TexturedVertex3D
+                {
+                    Position = new Vector3(position.X, position.Y, 0),
+                    Colour = Color4.White,
+                    TexturePosition = new Vector2(texRect.Left, texRect.Centre.Y)
+                });
+            }
+
+            private void createInnerVertex(Vector2 position)
+            {
+                Debug.Assert(triangleBatch != null);
+
+                triangleBatch.Add(new TexturedVertex3D
+                {
+                    Position = new Vector3(position.X, position.Y, 1),
+                    Colour = Color4.White,
+                    TexturePosition = new Vector2(texRect.Right, texRect.Centre.Y)
+                });
+            }
+
+            private void drawFan(Vector2 origin, Vector2 start, Vector2 end, bool clockwise, float theta)
+            {
+                float step = (float)Math.PI / max_res * (clockwise ? -1 : 1);
+                float angle = step;
+                Vector2 lastPoint = start;
+
+                while (Math.Abs(angle) < theta)
+                {
+                    Vector2 point = MathUtils.RotateAround(start, origin, angle);
+                    drawFanTriangle(lastPoint, point, origin);
+                    lastPoint = point;
+                    angle += step;
+                }
+
+                drawFanTriangle(lastPoint, end, origin);
+                return;
+
+                void drawFanTriangle(Vector2 p1, Vector2 p2, Vector2 p3)
+                {
+                    createOuterVertex(p1);
+                    createOuterVertex(p2);
+                    createInnerVertex(p3);
+                }
             }
 
             private void updateVertexBuffer()
@@ -234,7 +277,7 @@ namespace osu.Framework.Graphics.Lines
             {
                 base.Dispose(isDisposing);
 
-                quadBatch?.Dispose();
+                triangleBatch?.Dispose();
             }
 
             private enum SegmentStartLocation
@@ -305,36 +348,6 @@ namespace osu.Framework.Graphics.Lines
                     BottomLeft = StartPoint - ortho * radius;
                     BottomRight = EndPoint - ortho * radius;
                 }
-            }
-
-            [StructLayout(LayoutKind.Sequential)]
-            public readonly struct PathVertex : IEquatable<PathVertex>, IVertex
-            {
-                [VertexMember(2, VertexAttribPointerType.Float)]
-                public readonly Vector2 Position;
-
-                [VertexMember(2, VertexAttribPointerType.Float)]
-                public readonly Vector2 StartPos;
-
-                [VertexMember(2, VertexAttribPointerType.Float)]
-                public readonly Vector2 EndPos;
-
-                [VertexMember(1, VertexAttribPointerType.Float)]
-                public readonly float Radius;
-
-                public PathVertex(Vector2 position, Vector2 startPos, Vector2 endPos, float radius)
-                {
-                    Position = position;
-                    StartPos = startPos;
-                    EndPos = endPos;
-                    Radius = radius;
-                }
-
-                public bool Equals(PathVertex other) =>
-                    Position.Equals(other.Position)
-                    && StartPos.Equals(other.StartPos)
-                    && EndPos.Equals(other.EndPos)
-                    && Radius.Equals(other.Radius);
             }
         }
     }

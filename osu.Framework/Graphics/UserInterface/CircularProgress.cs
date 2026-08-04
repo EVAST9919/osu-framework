@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Shaders.Types;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Transforms;
+using osu.Framework.Utils;
 using osuTK;
 
 namespace osu.Framework.Graphics.UserInterface
@@ -162,8 +163,8 @@ namespace osu.Framework.Graphics.UserInterface
                 bool isInnerVertex = false;
 
                 // We are saving last 2 vertices to ensure same vertex position between neighboring triangles
-                TexturedVertex2D v1 = createVertex(rotateAround(outer, origin, -angle_delta));
-                TexturedVertex2D v2 = createVertex(rotateAround(inner, origin, 0));
+                TexturedVertex2D v1 = createVertex(MathUtils.RotateAround(outer, origin, -angle_delta));
+                TexturedVertex2D v2 = createVertex(MathUtils.RotateAround(inner, origin, 0));
                 TexturedVertex2D first = v1;
                 TexturedVertex2D second = v2;
 
@@ -176,7 +177,7 @@ namespace osu.Framework.Graphics.UserInterface
                     else if (i == segment_count * 2 - 2)
                         newVertex = first;
                     else
-                        newVertex = createVertex(rotateAround(isInnerVertex ? inner : outer, origin, angle));
+                        newVertex = createVertex(MathUtils.RotateAround(isInnerVertex ? inner : outer, origin, angle));
 
                     vertexBatch?.Add(v1);
                     vertexBatch?.Add(v2);
@@ -198,17 +199,6 @@ namespace osu.Framework.Graphics.UserInterface
                     TextureRect = new Vector4(tRect.Left, tRect.Top, tRect.Right, tRect.Bottom),
                     TexturePosition = new Vector2(tRect.Left + tRect.Width * pos.X, tRect.Top + tRect.Height * pos.Y)
                 };
-            }
-
-            private static Vector2 rotateAround(Vector2 input, Vector2 origin, float angle)
-            {
-                float sin = MathF.Sin(angle);
-                float cos = MathF.Cos(angle);
-
-                float xTranslated = input.X - origin.X;
-                float yTranslated = input.Y - origin.Y;
-
-                return new Vector2(xTranslated * cos - yTranslated * sin, xTranslated * sin + yTranslated * cos) + origin;
             }
 
             protected override void BindUniformResources(IShader shader, IRenderer renderer)
