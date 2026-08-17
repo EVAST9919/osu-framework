@@ -20,7 +20,6 @@ namespace osu.Framework.Graphics.Lines
         private class PathDrawNode : DrawNode
         {
             private const float precision = 0.01f; // Smallest allowed segment length. Used for segment reduction algorithm.
-            private const int max_res = 24;
 
             protected new Path Source => (Path)base.Source;
 
@@ -28,7 +27,6 @@ namespace osu.Framework.Graphics.Lines
 
             private float radius;
             private IShader? pathShader;
-            private long segmentsVersion;
             private IUniformBuffer<PathParameters>? parametersBuffer;
 
             private IVertexBatch<PathVertex>? quadBatch;
@@ -98,72 +96,68 @@ namespace osu.Framework.Graphics.Lines
             /// <param name="endCap">Whether end cap must be added to the current segment.</param>
             private void connect(ref DrawableSegment segment, ref DrawableSegment prevSegment, SegmentStartLocation location, bool endCap)
             {
-                // When segment starts outside the previous one, nothing is being connected to the start of the segment and start cap is required.
-                bool startCap = location == SegmentStartLocation.Outside;
-
                 Vector2 dir = segment.DirectionNormalized;
                 Vector2 capOffset = dir * radius;
 
-                // Segment starts at the end of the previous one - figure out the connection type
-                if (location == SegmentStartLocation.End)
+                if (endCap)
+                {
+                    segment.TopRight += capOffset;
+                    segment.BottomRight += capOffset;
+                }
+
+                // When segment starts outside the previous one, nothing is being connected to the start of the segment and start cap is required.
+                if (location == SegmentStartLocation.Outside)
+                {
+                    segment.TopLeft -= capOffset;
+                    segment.BottomLeft -= capOffset;
+                }
+                else if (location == SegmentStartLocation.End) // Segment starts at the end of the previous one - figure out the connection type
                 {
                     Debug.Assert(prevSegment.EndPoint == segment.StartPoint);
 
                     Vector2 dir2 = -prevSegment.DirectionNormalized;
                     Vector2.Dot(ref dir, ref dir2, out float dot);
 
-                    // Angle between segments is less than 90 degrees - don't draw anything and use segment start cap instead.
-                    // Overdraw is inevitable anyway and this seems like a cheaper option than computing exact shape.
-                    // Also by doing this we can further reduce vertex count.
+                    // Angle between segments is less than 90 degrees - use segment start cap.
+                    // We can't connect segments directly with a sharp angle, so we are using segment start cap to cover the hole.
                     if (dot >= 0)
                     {
-                        startCap = true;
+                        segment.TopLeft -= capOffset;
+                        segment.BottomLeft -= capOffset;
+                        return;
                     }
-                    else // angle is more than 90 degrees - connect segments to each other
+
+                    // angle is more than 90 degrees - connect segments to each other
+                    Vector2.PerpDot(ref dir, ref dir2, out float pDot);
+                    float thetaDiff = Math.Abs(MathF.Atan(pDot / dot));
+                    float intersectionDistance = radius * (float)Math.Tan(thetaDiff * 0.5);
+                    Vector2 intersectionOffset = dir * intersectionDistance;
+                    bool hasInnerIntersection = Math.Min(segment.LengthSquared, prevSegment.LengthSquared) > intersectionDistance * intersectionDistance;
+
+                    if (pDot < 0f) // clockwise
                     {
-                        Vector2.PerpDot(ref dir, ref dir2, out float pDot);
-                        float thetaDiff = Math.Abs(MathF.Atan(pDot / dot));
-                        float intersectionDistance = radius * (float)Math.Tan(thetaDiff * 0.5);
-                        Vector2 intersectionOffset = dir * intersectionDistance;
-                        bool hasInnerIntersection = Math.Min(segment.LengthSquared, prevSegment.LengthSquared) > intersectionDistance * intersectionDistance;
+                        // always connect top vertices
+                        segment.TopLeft -= intersectionOffset;
+                        prevSegment.TopRight = segment.TopLeft;
 
-                        if (pDot < 0f) // clockwise
+                        // connect bottom vertices only if there's an intersection between bottom edges
+                        if (hasInnerIntersection)
                         {
-                            // always connect top vertices
-                            segment.TopLeft -= intersectionOffset;
-                            prevSegment.TopRight = segment.TopLeft;
-
-                            // connect bottom vertices only if there's an intersection between bottom edges
-                            if (hasInnerIntersection)
-                            {
-                                segment.BottomLeft += intersectionOffset;
-                                prevSegment.BottomRight = segment.BottomLeft;
-                            }
-                        }
-                        else
-                        {
-                            segment.BottomLeft -= intersectionOffset;
+                            segment.BottomLeft += intersectionOffset;
                             prevSegment.BottomRight = segment.BottomLeft;
-
-                            if (hasInnerIntersection)
-                            {
-                                segment.TopLeft += intersectionOffset;
-                                prevSegment.TopRight = segment.TopLeft;
-                            }
                         }
                     }
-                }
+                    else
+                    {
+                        segment.BottomLeft -= intersectionOffset;
+                        prevSegment.BottomRight = segment.BottomLeft;
 
-                if (startCap)
-                {
-                    segment.TopLeft -= capOffset;
-                    segment.BottomLeft -= capOffset;
-                }
-
-                if (endCap)
-                {
-                    segment.TopRight += capOffset;
-                    segment.BottomRight += capOffset;
+                        if (hasInnerIntersection)
+                        {
+                            segment.TopLeft += intersectionOffset;
+                            prevSegment.TopRight = segment.TopLeft;
+                        }
+                    }
                 }
             }
 
@@ -181,37 +175,40 @@ namespace osu.Framework.Graphics.Lines
             {
                 Debug.Assert(segments.Count > 0);
 
-                Line segmentToProcess = segments[0];
+                Line mergedSegment = segments[0];
 
+                // location of the current segment relative to the previous one.
                 SegmentStartLocation location = SegmentStartLocation.Outside;
                 SegmentStartLocation nextLocation = SegmentStartLocation.End;
 
                 // We initialize "fake" initial segment before the 0'th one (which we don't want to draw)
                 // so that on first connect() call with current SegmentStartLocation parameters path start cap will be added.
-                DrawableSegment segmentToDraw = new DrawableSegment(segments[0], radius);
-                bool initialSkipped = false;
+                DrawableSegment prevSegment = new DrawableSegment(mergedSegment, radius);
+                bool drawPrevious = false;
 
                 // This loop tries to merge consecutive path segments which are located within the same line.
                 // If next segment deviates from the one being processed we will save it for drawing later, after the new one will be fully processed
                 // since the connection type between segments can be established only after we know "final" shape of them both.
                 for (int i = 1; i < segments.Count; i++)
                 {
-                    Vector2 dir = segmentToProcess.Direction;
-                    float lengthSquared = dir.X * dir.X + dir.Y * dir.Y;
-                    Vector2 nextVertex = segments[i].EndPoint;
+                    Line nextSegment = segments[i];
 
-                    // If segment is too short, make its end point equal start point of a new segment
-                    if (lengthSquared < precision)
+                    Vector2 dir = mergedSegment.Direction;
+                    float mergedLengthSquared = dir.X * dir.X + dir.Y * dir.Y;
+                    Vector2 nextVertex = nextSegment.EndPoint;
+
+                    // If merged segment is too short, connect it to the next vertex directly.
+                    if (mergedLengthSquared < precision * precision)
                     {
-                        segmentToProcess = new Line(segmentToProcess.StartPoint, nextVertex);
+                        mergedSegment = new Line(mergedSegment.StartPoint, nextVertex);
                         continue;
                     }
 
-                    Vector2 dir2 = nextVertex - segmentToProcess.StartPoint;
+                    Vector2 dir2 = nextVertex - mergedSegment.StartPoint;
                     Vector2.PerpDot(ref dir, ref dir2, out float pDot);
 
-                    // Expand segment if next end point is located within a line passing through it (distance from the next vertex to the segment is less than precision)
-                    if (pDot * pDot / lengthSquared < precision * precision)
+                    // Expand segment if next vertex is located within a line passing through it (distance from the next vertex to the segment is less than precision)
+                    if (pDot * pDot / mergedLengthSquared < precision * precision)
                     {
                         nextLocation = SegmentStartLocation.StartOrMiddle;
 
@@ -220,36 +217,39 @@ namespace osu.Framework.Graphics.Lines
                         // new vertex is located behind the segment start point, expand segment backwards
                         if (dot < 0)
                         {
-                            segmentToProcess = new Line(nextVertex, segmentToProcess.EndPoint);
+                            mergedSegment = new Line(nextVertex, mergedSegment.EndPoint);
                             location = SegmentStartLocation.Outside;
                         }
-                        else if (dot > lengthSquared) // new vertex is located in front of the end point, expand segment forward
+                        else if (dot > mergedLengthSquared) // new vertex is located in front of the end point, expand segment forward
                         {
-                            segmentToProcess = new Line(segmentToProcess.StartPoint, nextVertex);
+                            mergedSegment = new Line(mergedSegment.StartPoint, nextVertex);
                             nextLocation = SegmentStartLocation.End;
                         }
                     }
-                    else // Otherwise draw the expanded segment
+                    else // Otherwise draw expanded segment
                     {
-                        DrawableSegment s = new DrawableSegment(segmentToProcess, radius);
+                        DrawableSegment s = new DrawableSegment(mergedSegment, radius);
                         // if next segment starts at the start or the middle of the current one, nothing will be connected to the end of the current segment - end cap is required.
-                        connect(ref s, ref segmentToDraw, location, nextLocation == SegmentStartLocation.StartOrMiddle);
-                        if (initialSkipped)
-                            drawSegment(ref segmentToDraw);
-                        initialSkipped = true;
+                        connect(ref s, ref prevSegment, location, nextLocation == SegmentStartLocation.StartOrMiddle);
 
-                        segmentToDraw = s;
-                        segmentToProcess = segments[i];
+                        if (drawPrevious)
+                            drawSegment(ref prevSegment);
+                        drawPrevious = true;
+
+                        prevSegment = s;
+                        mergedSegment = nextSegment;
                         location = nextLocation;
                         nextLocation = SegmentStartLocation.End;
                     }
                 }
 
-                // Finish drawing last segment
-                var ds = new DrawableSegment(segmentToProcess, radius);
-                connect(ref ds, ref segmentToDraw, location, true);
-                if (initialSkipped)
-                    drawSegment(ref segmentToDraw);
+                // Finish drawing last segments
+                var ds = new DrawableSegment(mergedSegment, radius);
+                connect(ref ds, ref prevSegment, location, true);
+
+                if (drawPrevious)
+                    drawSegment(ref prevSegment);
+
                 drawSegment(ref ds);
             }
 
