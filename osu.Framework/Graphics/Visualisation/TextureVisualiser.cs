@@ -20,6 +20,7 @@ using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osuTK;
 using osuTK.Graphics;
+using osuTK.Input;
 
 namespace osu.Framework.Graphics.Visualisation
 {
@@ -133,6 +134,17 @@ namespace osu.Framework.Graphics.Visualisation
         {
             textureInspector.Inspect(texture);
             textureInspector.Show();
+        }
+
+        protected override bool OnKeyDown(KeyDownEvent e)
+        {
+            if (e.Key == Key.Escape && textureInspector.State.Value == Visibility.Visible)
+            {
+                textureInspector.Hide();
+                return true;
+            }
+
+            return base.OnKeyDown(e);
         }
 
         private partial class TexturePanel : CompositeDrawable
