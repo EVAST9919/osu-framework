@@ -30,6 +30,7 @@ namespace osu.Framework.Graphics.Visualisation
         private readonly Checkerboard checkerboard;
         private readonly Container previewContainer;
         private readonly InteractiveContainer interactiveContainer;
+        private readonly TextureInfo textureInfo;
 
         public TextureInspector()
         {
@@ -94,16 +95,23 @@ namespace osu.Framework.Graphics.Visualisation
                         {
                             RelativeSizeAxes = Axes.Both,
                             Masking = true,
-                            Child = interactiveContainer = new InteractiveContainer
+                            Children = new Drawable[]
                             {
-                                RelativeSizeAxes = Axes.Both,
-                                Child = previewContainer = new Container
+                                interactiveContainer = new InteractiveContainer
                                 {
-                                    Children = new Drawable[]
+                                    RelativeSizeAxes = Axes.Both,
+                                    Child = previewContainer = new Container
                                     {
-                                        checkerboard = new Checkerboard(),
-                                        preview = new TexturePreview()
+                                        Children = new Drawable[]
+                                        {
+                                            checkerboard = new Checkerboard(),
+                                            preview = new TexturePreview()
+                                        }
                                     }
+                                },
+                                textureInfo = new TextureInfo
+                                {
+                                    Margin = new MarginPadding(10)
                                 }
                             }
                         }
@@ -134,11 +142,55 @@ namespace osu.Framework.Graphics.Visualisation
             preview.Texture = texture;
             preview.Size = texture.Size;
             interactiveContainer.Fit();
+
+            textureInfo.UpdateInfo(texture);
         }
 
         protected override void PopIn() => this.ResizeWidthTo(width + padding * 2, 500, Easing.OutQuint);
 
         protected override void PopOut() => this.ResizeWidthTo(0, 500, Easing.OutQuint);
+
+        private partial class TextureInfo : Container
+        {
+            private readonly SpriteText sizeInfo;
+
+            public TextureInfo()
+            {
+                AutoSizeAxes = Axes.Both;
+                Children = new Drawable[]
+                {
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Color4.Black,
+                        Alpha = 0.5f
+                    },
+                    new Container
+                    {
+                        AutoSizeAxes = Axes.Both,
+                        Padding = new MarginPadding(5),
+                        Child = new FillFlowContainer
+                        {
+                            AutoSizeAxes = Axes.Both,
+                            Direction = FillDirection.Vertical,
+                            Spacing = new Vector2(0, 5),
+                            Children = new Drawable[]
+                            {
+                                sizeInfo = new SpriteText
+                                {
+                                    Font = new FontUsage(size: 16)
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+
+            public void UpdateInfo(Texture texture)
+            {
+                sizeInfo.Text = $"Size: {texture.Width}x{texture.Height}";
+            }
+        }
 
         private partial class ChannelTabControl : BasicTabControl<Channel>
         {
