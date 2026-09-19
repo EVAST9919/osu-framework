@@ -23,6 +23,7 @@ namespace osu.Framework.Graphics.Visualisation
     internal partial class TextureInspector : VisibilityContainer
     {
         private const float width = 600;
+        private const float padding = 10;
 
         private readonly ChannelTabControl channelSelector;
         private readonly TexturePreview preview;
@@ -33,7 +34,7 @@ namespace osu.Framework.Graphics.Visualisation
         public TextureInspector()
         {
             RelativeSizeAxes = Axes.Y;
-            Padding = new MarginPadding(10);
+            Padding = new MarginPadding(padding);
             Child = new GridContainer
             {
                 RelativeSizeAxes = Axes.Y,
@@ -135,7 +136,7 @@ namespace osu.Framework.Graphics.Visualisation
             interactiveContainer.Fit();
         }
 
-        protected override void PopIn() => this.ResizeWidthTo(width, 500, Easing.OutQuint);
+        protected override void PopIn() => this.ResizeWidthTo(width + padding * 2, 500, Easing.OutQuint);
 
         protected override void PopOut() => this.ResizeWidthTo(0, 500, Easing.OutQuint);
 
