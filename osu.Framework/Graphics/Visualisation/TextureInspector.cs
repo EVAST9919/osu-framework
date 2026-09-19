@@ -123,7 +123,7 @@ namespace osu.Framework.Graphics.Visualisation
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            channelSelector.Current.BindValueChanged(c => preview.UpdateChannels(c.NewValue), true);
+            channelSelector.Current.BindValueChanged(c => preview.Channel = c.NewValue, true);
         }
 
         public void Inspect(Texture texture)
@@ -222,58 +222,22 @@ namespace osu.Framework.Graphics.Visualisation
 
         private partial class TexturePreview : Sprite
         {
+            private Channel channel;
+
+            public Channel Channel
+            {
+                get => channel;
+                set
+                {
+                    channel = value;
+                    Invalidate(Invalidation.DrawNode);
+                }
+            }
+
             [BackgroundDependencyLoader]
             private void load(ShaderManager shaders)
             {
                 TextureShader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, "TextureChannels");
-            }
-
-            private bool r;
-            private bool g;
-            private bool b;
-            private bool a;
-
-            public void UpdateChannels(Channel channel)
-            {
-                switch (channel)
-                {
-                    case Channel.All:
-                        r = true;
-                        g = true;
-                        b = true;
-                        a = true;
-                        break;
-
-                    case Channel.R:
-                        r = true;
-                        g = false;
-                        b = false;
-                        a = false;
-                        break;
-
-                    case Channel.G:
-                        r = false;
-                        g = true;
-                        b = false;
-                        a = false;
-                        break;
-
-                    case Channel.B:
-                        r = false;
-                        g = false;
-                        b = true;
-                        a = false;
-                        break;
-
-                    case Channel.A:
-                        r = false;
-                        g = false;
-                        b = false;
-                        a = true;
-                        break;
-                }
-
-                Invalidate(Invalidation.DrawNode);
             }
 
             protected override DrawNode CreateDrawNode() => new TexturePreviewDrawNode(this);
@@ -287,19 +251,13 @@ namespace osu.Framework.Graphics.Visualisation
                 {
                 }
 
-                private bool r;
-                private bool g;
-                private bool b;
-                private bool a;
+                private Channel channel;
 
                 public override void ApplyState()
                 {
                     base.ApplyState();
 
-                    r = Source.r;
-                    g = Source.g;
-                    b = Source.b;
-                    a = Source.a;
+                    channel = Source.channel;
                 }
 
                 private IUniformBuffer<TextureChannelParameters>? parametersBuffer;
@@ -311,13 +269,32 @@ namespace osu.Framework.Graphics.Visualisation
                     parametersBuffer ??= renderer.CreateUniformBuffer<TextureChannelParameters>();
                     parametersBuffer.Data = new TextureChannelParameters
                     {
-                        R = r,
-                        G = g,
-                        B = b,
-                        A = a
+                        ChannelValue = getChannelFloatRepresentation(channel),
                     };
 
                     shader.BindUniformBlock("m_TextureChannelParameters", parametersBuffer);
+                }
+
+                private float getChannelFloatRepresentation(Channel c)
+                {
+                    switch (c)
+                    {
+                        default:
+                        case Channel.All:
+                            return 0.5f;
+
+                        case Channel.R:
+                            return 1.5f;
+
+                        case Channel.G:
+                            return 2.5f;
+
+                        case Channel.B:
+                            return 3.5f;
+
+                        case Channel.A:
+                            return 4.5f;
+                    }
                 }
 
                 protected internal override bool CanDrawOpaqueInterior => false;
@@ -331,10 +308,8 @@ namespace osu.Framework.Graphics.Visualisation
                 [StructLayout(LayoutKind.Sequential, Pack = 1)]
                 private record struct TextureChannelParameters
                 {
-                    public UniformBool R;
-                    public UniformBool G;
-                    public UniformBool B;
-                    public UniformBool A;
+                    public UniformFloat ChannelValue;
+                    private UniformPadding12 pad;
                 }
             }
         }
