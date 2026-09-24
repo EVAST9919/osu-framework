@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Shaders.Types;
@@ -27,7 +28,6 @@ namespace osu.Framework.Graphics.Visualisation
 
         private readonly ChannelTabControl channelSelector;
         private readonly TexturePreview preview;
-        private readonly Checkerboard checkerboard;
         private readonly Container previewContainer;
         private readonly InteractiveContainer interactiveContainer;
         private readonly TextureInfo textureInfo;
@@ -97,6 +97,12 @@ namespace osu.Framework.Graphics.Visualisation
                             Masking = true,
                             Children = new Drawable[]
                             {
+                                new Checkerboard
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    TextureRelativeSizeAxes = Axes.None,
+                                    TextureRectangle = new RectangleF(Vector2.Zero, new Vector2(300))
+                                },
                                 interactiveContainer = new InteractiveContainer
                                 {
                                     RelativeSizeAxes = Axes.Both,
@@ -104,8 +110,14 @@ namespace osu.Framework.Graphics.Visualisation
                                     {
                                         Children = new Drawable[]
                                         {
-                                            checkerboard = new Checkerboard(),
-                                            preview = new TexturePreview()
+                                            preview = new TexturePreview
+                                            {
+                                                RelativeSizeAxes = Axes.Both
+                                            },
+                                            new TextureBorder
+                                            {
+                                                RelativeSizeAxes = Axes.Both
+                                            }
                                         }
                                     }
                                 },
@@ -138,9 +150,7 @@ namespace osu.Framework.Graphics.Visualisation
         public void Inspect(Texture texture)
         {
             previewContainer.Size = texture.Size;
-            checkerboard.Size = texture.Size;
             preview.Texture = texture;
-            preview.Size = texture.Size;
             interactiveContainer.Fit();
 
             textureInfo.UpdateInfo(texture);
@@ -149,6 +159,27 @@ namespace osu.Framework.Graphics.Visualisation
         protected override void PopIn() => this.ResizeWidthTo(width + padding * 2, 500, Easing.OutQuint);
 
         protected override void PopOut() => this.ResizeWidthTo(0, 500, Easing.OutQuint);
+
+        private partial class TextureBorder : Box
+        {
+            protected override DrawNode CreateDrawNode() => new TextureBorderDrawNode(this);
+
+            private partial class TextureBorderDrawNode : SpriteDrawNode
+            {
+                public TextureBorderDrawNode(Sprite source)
+                    : base(source)
+                {
+                }
+
+                protected override void Blit(IRenderer renderer)
+                {
+                    renderer.DrawQuad(renderer.WhitePixel, new Quad(ScreenSpaceDrawQuad.TopLeft.X, ScreenSpaceDrawQuad.TopLeft.Y, ScreenSpaceDrawQuad.Width, 1), DrawColourInfo.Colour);
+                    renderer.DrawQuad(renderer.WhitePixel, new Quad(ScreenSpaceDrawQuad.TopLeft.X, ScreenSpaceDrawQuad.TopLeft.Y, 1, ScreenSpaceDrawQuad.Height), DrawColourInfo.Colour);
+                    renderer.DrawQuad(renderer.WhitePixel, new Quad(ScreenSpaceDrawQuad.TopRight.X - 1, ScreenSpaceDrawQuad.TopRight.Y, 1, ScreenSpaceDrawQuad.Height), DrawColourInfo.Colour);
+                    renderer.DrawQuad(renderer.WhitePixel, new Quad(ScreenSpaceDrawQuad.BottomLeft.X, ScreenSpaceDrawQuad.BottomLeft.Y - 1, ScreenSpaceDrawQuad.Width, 1), DrawColourInfo.Colour);
+                }
+            }
+        }
 
         private partial class TextureInfo : Container
         {
